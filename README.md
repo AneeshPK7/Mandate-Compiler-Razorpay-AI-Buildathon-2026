@@ -123,6 +123,36 @@ curl localhost:8000/audit/verify
 - **Dev signing keys** are generated to a gitignored `.signing_key`. Production
   would put the private key in an HSM/KMS behind an authenticated boundary.
 
+## Synthetic data as a second test suite
+
+[app/synthetic.py](app/synthetic.py) generates 275 transactions with **exact**
+ground-truth labels, and [tests/test_dataset.py](tests/test_dataset.py) replays
+them through the real engine. Every disagreement is a bug.
+
+```bash
+python scripts/generate_data.py --verify
+python scripts/generate_data.py --out dataset.json
+```
+
+Generation is deterministic and seeded rather than LLM-driven. An LLM would
+give richer vocabulary, but the labels are the whole point: if the expected
+outcome were itself a guess, replaying would prove nothing.
+
+Labels stay exact through one discipline: **every transaction violates at most
+one rule.** When building a merchant violation the amount, category, time and
+validity are all kept in-policy, so exactly one rule can fire and precedence
+never has to be reasoned about. Stateful rules (cumulative and frequency caps)
+get their own weeks, where the generator counts the crossover point
+deliberately. The generator imports no evaluation logic from the engine, so
+agreement between them is meaningful.
+
+This caught four real bugs the unit tests missed — three in the generator, all
+of the same shape: a scenario that *looked* like it tested one rule but
+actually tripped another (₹2000 instalments against a ₹1000 per-transaction
+cap; an `hour=23` "violation" landing on 23:00, which is inside the window;
+stateful labels assigned in generation order while the engine evaluates in
+timestamp order).
+
 ## Status
 
 - **Day 1** — core schemas (`Mandate`, `Transaction`, `Decision`), FastAPI/SQLite skeleton.
@@ -131,7 +161,9 @@ curl localhost:8000/audit/verify
 - **Day 3** — NL→Mandate compiler with ambiguity detection and a deterministic
   validation gate, plus a 15-case eval corpus.
 - **Day 4** — Ed25519 mandate signing, hash-chained audit log with
-  four-attack tamper detection, chain-verification endpoint. 154 tests.
+  four-attack tamper detection, chain-verification endpoint.
+- **Day 5** — 275-transaction labelled dataset replayed through the engine as a
+  differential test. 169 tests.
 
-Synthetic data, the simulator, and revocation land next per the plan in
+The simulator (SSE streaming) and live revocation land next per the plan in
 CONTEXT.md.
