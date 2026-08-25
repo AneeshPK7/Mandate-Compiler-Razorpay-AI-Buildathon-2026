@@ -6,3 +6,4 @@ pynacl
 jinja2
 python-multipart
 anthropic
+pytest

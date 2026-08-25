@@ -1,5 +1,5 @@
 import enum
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from sqlalchemy import JSON, Column
@@ -8,6 +8,11 @@ from sqlmodel import Field, SQLModel
 
 def _uuid() -> str:
     return uuid4().hex
+
+
+def utcnow() -> datetime:
+    """Naive UTC. Stored naive so DB reads and in-process values compare cleanly."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class Period(str, enum.Enum):
@@ -81,4 +86,4 @@ class Decision(SQLModel, table=True):
     prev_hash: str
     audit_hash: str = Field(index=True)
 
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utcnow)
