@@ -29,7 +29,7 @@ def compute_usage(session: Session, mandate: Mandate, moment: datetime) -> Usage
         .join(Decision, Decision.transaction_id == Transaction.id)
         .where(
             Transaction.mandate_id == mandate.id,
-            Decision.result == DecisionResult.allow,
+            Decision.result == DecisionResult.allow.value,
             Transaction.timestamp >= start,
             Transaction.timestamp < end,
         )

@@ -6,3 +6,4 @@ venv/
 *.sqlite3
 .env
 .DS_Store
+.signing_key

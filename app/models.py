@@ -74,12 +74,24 @@ class Transaction(SQLModel, table=True):
 
 
 class Decision(SQLModel, table=True):
-    """The policy engine's verdict on a Transaction, chained into the audit log."""
+    """The policy engine's verdict on a Transaction, chained into the audit log.
 
-    id: str = Field(default_factory=_uuid, primary_key=True)
+    `seq` is a monotonic integer rather than a UUID because the audit chain
+    needs an unambiguous order and a way to notice a *missing* entry. A gap in
+    the sequence is evidence of deletion; a UUID primary key could not express
+    that.
+    """
+
+    seq: int | None = Field(default=None, primary_key=True)
+    id: str = Field(default_factory=_uuid, unique=True, index=True)
     transaction_id: str = Field(index=True, foreign_key="transaction.id")
 
-    result: DecisionResult
+    # Stored as a plain string holding a DecisionResult *value*, not as a SQL
+    # enum. The audit verifier must be able to read whatever is actually in the
+    # database — including values an attacker wrote — and report them as
+    # tampering. A native enum column raises on unknown values, which would
+    # crash verification instead of flagging it.
+    result: str
     reason_code: str
     rule_triggered: str
 

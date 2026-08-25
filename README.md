@@ -76,13 +76,62 @@ words, windows crossing midnight, and three cases that *should* be hard: a
 policy naming no merchant, a day-of-week constraint the schema cannot express,
 and a self-contradictory policy the gate must reject.
 
+## Signing and the audit chain
+
+Two mechanisms split the integrity work, because neither covers the other:
+
+**Ed25519 signature** ([app/signing.py](app/signing.py)) covers the *grant
+terms* — principal, agent, caps, allowlist, exclusions, window, validity,
+version. Editing any of them in the database breaks verification.
+
+It deliberately does **not** cover `status`. Revocation is a legitimate act by
+the principal; signing it would mean either revocation invalidates the
+signature (making a revoked mandate look forged) or re-signing on every
+transition (eroding the signature's meaning as an attestation of the original
+grant). Status transitions are made tamper-evident by the audit chain instead.
+
+**Hash chain** ([app/audit.py](app/audit.py)) links every decision to its
+predecessor: `audit_hash(n) = SHA256(canonical(decision_n + prev_hash))`.
+Because `prev_hash` sits inside the hashed payload, altering one entry orphans
+every entry after it. Four attacks are each covered by a test:
+
+| Attack | Caught by |
+|---|---|
+| modification | contents no longer hash to the stored value |
+| deletion | gap in the monotonic `seq` |
+| insertion | forged entry's `prev_hash` doesn't match the real head |
+| reordering | `seq` is inside the hashed payload |
+
+Both depend on [app/canonical.py](app/canonical.py) — byte-stable JSON (sorted
+keys, no insignificant whitespace, ASCII-escaped, naive-UTC ISO timestamps).
+Without it the same logical record could serialize two ways, and the whole
+scheme would be decorative.
+
+```bash
+python scripts/demo_chain.py   # signs, decides, tampers via raw SQL, detects it
+curl localhost:8000/audit/verify
+```
+
+### Known limitations (deliberate, not oversights)
+
+- **Tail truncation is not detected.** Deleting the *last* entries leaves no
+  sequence gap. Catching that needs the head hash anchored somewhere the
+  attacker can't reach — published, or counter-signed. `chain_head` exists for
+  that; the anchoring does not. There is a test asserting this gap honestly.
+- **An attacker who can rewrite the whole chain forward** from the point of
+  tampering would produce a self-consistent log. Same fix: external anchoring.
+- **Dev signing keys** are generated to a gitignored `.signing_key`. Production
+  would put the private key in an HSM/KMS behind an authenticated boundary.
+
 ## Status
 
 - **Day 1** — core schemas (`Mandate`, `Transaction`, `Decision`), FastAPI/SQLite skeleton.
 - **Day 2** — deterministic policy engine (8 rules, fixed precedence) + usage
   accumulation, 46 unit tests.
 - **Day 3** — NL→Mandate compiler with ambiguity detection and a deterministic
-  validation gate, 84 unit tests, plus a 15-case eval corpus.
+  validation gate, plus a 15-case eval corpus.
+- **Day 4** — Ed25519 mandate signing, hash-chained audit log with
+  four-attack tamper detection, chain-verification endpoint. 154 tests.
 
-Ed25519 signing and the hash-chained audit log land next per the plan in
+Synthetic data, the simulator, and revocation land next per the plan in
 CONTEXT.md.

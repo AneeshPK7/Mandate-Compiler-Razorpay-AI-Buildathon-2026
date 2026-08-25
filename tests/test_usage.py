@@ -30,7 +30,7 @@ def record(session: Session, mandate_id: str, amount: int, when: datetime, resul
     session.add(
         Decision(
             transaction_id=txn.id,
-            result=result,
+            result=result.value,
             reason_code="ALLOWED" if result is DecisionResult.allow else "BLOCKED",
             rule_triggered="none",
             prev_hash="0" * 64,
