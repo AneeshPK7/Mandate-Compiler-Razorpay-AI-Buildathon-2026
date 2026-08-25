@@ -38,11 +38,51 @@ Two deliberate choices worth calling out:
 - **Blocked transactions never consume budget.** Otherwise a burst of blocked
   attempts could starve legitimate spending.
 
+## The compiler's trust boundary
+
+[app/compiler.py](app/compiler.py) is the only place an LLM appears. It
+translates English (or Hinglish) into a `MandateDraft` — and that draft is not
+trusted. `validate_draft` bounds-checks every field with ordinary code before
+anything can be signed:
+
+- caps must be positive and under a compiler ceiling
+- per-transaction cap may not exceed the period cap
+- times must be well-formed 24h `HH:MM`
+- the allowlist may not be empty
+- a merchant may not also appear as an excluded category
+
+A draft that fails the gate raises `ValidationError` and never becomes an
+enforceable mandate. A hallucinated `₹99,999,999` cap is then a translation
+bug, not a spending bug.
+
+The model is also required to **flag its own guesses**. Any field the source
+sentence left open comes back in `ambiguities` with a clarifying question, so
+the human resolves it instead of the system silently assuming. Under-flagging
+is treated as a failure in the eval even when the guessed value looks sane.
+
+Money is stored in paise (integer minor units) throughout, matching Razorpay's
+convention; the model emits rupees and the conversion happens in code.
+
+### Evaluating the compiler
+
+```bash
+export ANTHROPIC_API_KEY=...
+python scripts/eval_compiler.py          # 15 cases
+python scripts/eval_compiler.py --case 6 -v
+```
+
+The corpus covers Hinglish input, `2k`-style shorthand, amounts written as
+words, windows crossing midnight, and three cases that *should* be hard: a
+policy naming no merchant, a day-of-week constraint the schema cannot express,
+and a self-contradictory policy the gate must reject.
+
 ## Status
 
 - **Day 1** — core schemas (`Mandate`, `Transaction`, `Decision`), FastAPI/SQLite skeleton.
 - **Day 2** — deterministic policy engine (8 rules, fixed precedence) + usage
   accumulation, 46 unit tests.
+- **Day 3** — NL→Mandate compiler with ambiguity detection and a deterministic
+  validation gate, 84 unit tests, plus a 15-case eval corpus.
 
-NL compiler, Ed25519 signing, and the hash-chained audit log land next per the
-plan in CONTEXT.md.
+Ed25519 signing and the hash-chained audit log land next per the plan in
+CONTEXT.md.
