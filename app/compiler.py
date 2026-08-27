@@ -23,7 +23,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from app.models import Mandate, Period, utcnow
+from app.models import Mandate, MandateStatus, Period, utcnow
 
 MODEL = "claude-opus-5"
 PAISE_PER_RUPEE = 100
@@ -135,6 +135,26 @@ def compile_policy(text: str, client=None) -> MandateDraft:
     return response.parsed_output
 
 
+# Fields where a guess is not good enough to enforce without a human saying so.
+# These directly bound how much money can move and to whom; a wrong assumption
+# on any of them is a spending error, not a cosmetic one. Guesses about the
+# time window or validity period are recorded but do not block activation.
+CRITICAL_AMBIGUITY_FIELDS = frozenset(
+    {
+        "merchant_allowlist",
+        "category_exclusions",
+        "amount_cap_per_txn_rupees",
+        "amount_cap_period_rupees",
+        "period",
+    }
+)
+
+
+def critical_ambiguities(draft: "MandateDraft") -> list[AmbiguityFlag]:
+    """Ambiguities that must be resolved by a human before enforcement."""
+    return [a for a in draft.ambiguities if a.field.strip() in CRITICAL_AMBIGUITY_FIELDS]
+
+
 class ValidationError(Exception):
     """The draft failed a deterministic check and must not be signed."""
 
@@ -234,14 +254,26 @@ def draft_to_mandate(
 ) -> Mandate:
     """Convert a validated draft into a Mandate, converting rupees to paise.
 
+    A draft carrying a critical ambiguity becomes a mandate in
+    `pending_confirmation`: signed and stored, but not enforceable until a human
+    resolves the guess. The system declines to act on a policy it is not
+    confident it understood, rather than guessing and hoping.
+
     Raises ValidationError if the draft has not passed `validate_draft` cleanly.
     """
     problems = validate_draft(draft)
     if problems:
         raise ValidationError("; ".join(problems))
 
+    status = (
+        MandateStatus.pending_confirmation
+        if critical_ambiguities(draft)
+        else MandateStatus.active
+    )
+
     now = utcnow()
     return Mandate(
+        status=status,
         principal_id=principal_id,
         agent_id=agent_id,
         amount_cap_per_txn=draft.amount_cap_per_txn_rupees * PAISE_PER_RUPEE,

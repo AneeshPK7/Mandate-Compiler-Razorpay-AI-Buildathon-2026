@@ -170,7 +170,34 @@
     <section id="secFlags" hidden>
       <h2>Fields the compiler had to guess</h2>
       <div id="flags"></div>
-      <div class="hint">Flagged, not silently assumed — a human resolves these.</div>
+      <div id="pendingBox" hidden>
+        <div class="hint" style="color:var(--warn);margin-bottom:8px">
+          This mandate is <b>not enforceable</b> until you resolve the flagged
+          term. The engine blocks every transaction with
+          <span class="mono">MANDATE_NOT_CONFIRMED</span>.
+        </div>
+        <div class="row">
+          <button id="btnConfirm">Confirm as assumed</button>
+          <button id="btnAmend" class="primary">Correct it…</button>
+        </div>
+        <div id="amendBox" hidden style="margin-top:9px">
+          <div class="row">
+            <input id="amendField" class="mono" readonly
+                   style="flex:1;min-width:0;padding:7px 9px;background:var(--panel-2);
+                          color:var(--dim);border:1px solid var(--line);border-radius:6px;font-size:12px">
+          </div>
+          <div class="row" style="margin-top:6px">
+            <input id="amendValue" placeholder="corrected value"
+                   style="flex:1;min-width:0;padding:7px 9px;background:var(--panel);
+                          color:var(--text);border:1px solid var(--line);border-radius:6px;font:13px inherit">
+            <button id="btnApplyAmend">Apply</button>
+          </div>
+          <div class="hint" id="amendHint">
+            Lists are comma-separated. Amending re-signs the mandate and bumps its version.
+          </div>
+        </div>
+      </div>
+      <div class="hint" id="flagsHint">Flagged, not silently assumed — a human resolves these.</div>
     </section>
 
     <section id="secProblems" hidden>
@@ -201,6 +228,26 @@
           <button id="btnViewLog">View log</button>
         </div>
         <div id="chainReason" class="hint"></div>
+      </div>
+    </section>
+
+    <section id="secTamper" hidden>
+      <h2>Tamper with the log</h2>
+      <div class="card">
+        <div class="hint" style="margin-top:0;margin-bottom:9px">
+          Demo only. Edits the database directly with raw SQL — the realistic
+          threat — then verification is run against it.
+        </div>
+        <div class="row">
+          <button id="btnTamperFlip">Flip a BLOCK → ALLOW</button>
+          <button id="btnTamperDelete">Delete an entry</button>
+          <button id="btnTamperForge">Forge the hash</button>
+        </div>
+        <div class="row" style="margin-top:7px">
+          <button id="btnReset">Reset demo</button>
+          <span class="hint" style="margin:0">Verification reports the first break — reset between attacks.</span>
+        </div>
+        <div id="tamperOut" class="hint"></div>
       </div>
     </section>
 
@@ -249,6 +296,7 @@ const rupees = paise => "₹" + (paise / 100).toLocaleString("en-IN",
 let mandateId = null;
 let stream = null;
 let counts = {};
+let pendingField = null;
 
 /* ---------------------------------------------------------------- helpers */
 
@@ -352,13 +400,19 @@ $("btnCompile").onclick = async () => {
 
     if (res.ambiguities && res.ambiguities.length) {
       $("flags").innerHTML = res.ambiguities.map(a => `
-        <div class="flag">
-          <div class="field">${escapeHtml(a.field)}</div>
+        <div class="flag" ${a.blocking ? 'style="border-left-color:var(--block)"' : ""}>
+          <div class="field">${escapeHtml(a.field)}${a.blocking ? " · blocking" : ""}</div>
           <div class="issue">${escapeHtml(a.issue)}</div>
           <div class="q">${escapeHtml(a.clarifying_question)}
             <br>assumed: <b>${escapeHtml(a.assumed_value)}</b></div>
         </div>`).join("");
       $("secFlags").hidden = false;
+
+      const blocking = res.ambiguities.filter(a => a.blocking);
+      pendingField = blocking.length ? blocking[0].field : null;
+      $("pendingBox").hidden = !pendingField;
+      $("amendBox").hidden = true;
+      if (pendingField) $("amendField").value = pendingField;
     }
 
     if (res.status === "rejected") {
@@ -464,9 +518,105 @@ $("btnRevoke").onclick = async () => {
   if (!stream) await refreshChain(false);
 };
 
+/* ------------------------------------- resolving a flagged ambiguity ----- */
+
+$("btnConfirm").onclick = async () => {
+  if (!mandateId) return;
+  const res = await fetch(`/mandates/${mandateId}/confirm`, { method: "POST" })
+    .then(r => r.json());
+  renderTerms(res.mandate);
+  $("pendingBox").hidden = true;
+  $("flagsHint").textContent = "Assumption confirmed by the principal. Now enforceable.";
+  await refreshChain(false);
+  await refreshPending();
+};
+
+$("btnAmend").onclick = () => { $("amendBox").hidden = !$("amendBox").hidden; };
+
+$("btnApplyAmend").onclick = async () => {
+  if (!mandateId || !pendingField) return;
+  const raw = $("amendValue").value.trim();
+  if (!raw) return;
+
+  // Lists are comma-separated; numeric caps are sent as integers. Field names
+  // ending in _rupees are the compiler's own units.
+  let value;
+  if (pendingField.endsWith("_allowlist") || pendingField.endsWith("_exclusions")) {
+    value = raw.split(",").map(s => s.trim()).filter(Boolean);
+  } else if (pendingField.endsWith("_rupees") || pendingField === "frequency_cap") {
+    value = parseInt(raw, 10);
+    if (Number.isNaN(value)) { $("amendHint").textContent = "Expected a number."; return; }
+  } else {
+    value = raw;
+  }
+
+  const res = await fetch(`/mandates/${mandateId}/amend`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ changes: { [pendingField]: value } }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json();
+    $("amendHint").textContent = "Rejected: " + (err.detail || res.status);
+    return;
+  }
+
+  const body = await res.json();
+  renderTerms(body.mandate);
+  $("pendingBox").hidden = true;
+  $("flagsHint").textContent =
+    `Corrected. Mandate re-signed at version ${body.mandate.version}.`;
+  await refreshChain(false);
+  await refreshPending();
+};
+
 /* ----------------------------------------------------------------- audit */
 
 $("btnVerify").onclick = () => refreshChain(true);
+
+/* ------------------------------------------------------- tamper demo ---- */
+
+async function runTamper(attack) {
+  const out = $("tamperOut");
+  const res = await fetch(`/demo/tamper/${attack}`, { method: "POST" });
+  if (!res.ok) {
+    const err = await res.json();
+    out.textContent = "Could not tamper: " + (err.detail || res.status);
+    return;
+  }
+  const t = await res.json();
+  out.innerHTML =
+    `<div style="margin-top:8px">${escapeHtml(t.description)}</div>` +
+    `<div style="margin-top:6px;color:${t.detected ? "var(--allow)" : "var(--block)"}">` +
+    (t.detected
+      ? `Detected at seq ${t.broken_at_seq} — ${escapeHtml(t.reason)}`
+      : "NOT DETECTED — this would be a bug") +
+    `</div>`;
+  await refreshChain(true);
+}
+
+$("btnReset").onclick = async () => {
+  await fetch("/demo/reset", { method: "POST" });
+  mandateId = null; pendingField = null;
+  resetRun();
+  $("secMandate").hidden = $("secFlags").hidden = $("secProblems").hidden = true;
+  $("btnSim").disabled = $("btnRevoke").disabled = true;
+  $("tamperOut").textContent = "";
+  $("sPending").textContent = "0";
+  $("simHint").textContent = "Compile a policy or load the demo mandate first.";
+  $("tableTitle").textContent = "Decisions";
+  await refreshChain(false);
+};
+
+$("btnTamperFlip").onclick = () => runTamper("flip");
+$("btnTamperDelete").onclick = () => runTamper("delete");
+$("btnTamperForge").onclick = () => runTamper("forge");
+
+// The tamper panel appears only when the server has the demo flag enabled.
+fetch("/health").then(r => r.json()).then(h => {
+  $("secTamper").hidden = !h.demo_tamper;
+});
 
 $("btnViewLog").onclick = async () => {
   const rows = await fetch("/audit/chain?limit=500").then(r => r.json());

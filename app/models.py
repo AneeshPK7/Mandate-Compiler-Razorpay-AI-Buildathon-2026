@@ -25,6 +25,11 @@ class MandateStatus(str, enum.Enum):
     active = "active"
     revoked = "revoked"
     expired = "expired"
+    # Compiled, signed and stored, but NOT enforceable: the compiler flagged a
+    # field it had to guess on, and a human has not yet confirmed it. Failing
+    # closed here is the point — a policy the system is unsure it understood
+    # must not silently start authorising payments.
+    pending_confirmation = "pending_confirmation"
 
 
 class DecisionResult(str, enum.Enum):
@@ -79,6 +84,8 @@ class EventType:
     DECISION = "DECISION"
     MANDATE_CREATED = "MANDATE_CREATED"
     MANDATE_REVOKED = "MANDATE_REVOKED"
+    MANDATE_AMENDED = "MANDATE_AMENDED"
+    MANDATE_CONFIRMED = "MANDATE_CONFIRMED"
 
 
 class Decision(SQLModel, table=True):

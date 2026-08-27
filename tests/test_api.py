@@ -52,7 +52,10 @@ def seed(session: Session, n: int = 4):
 
 
 def test_health(client):
-    assert client.get("/health").json() == {"status": "ok"}
+    body = client.get("/health").json()
+    assert body["status"] == "ok"
+    # Tells the dashboard whether to offer the tamper controls at all.
+    assert body["demo_tamper"] is False
 
 
 def test_pubkey_is_ed25519_hex(client):
@@ -314,3 +317,85 @@ def test_compiled_mandate_is_recorded_in_the_chain(sim_client, monkeypatch):
 
     log = sim_client.get("/audit/chain").json()
     assert any(e["reason_code"] == "MANDATE_CREATED" for e in log)
+
+
+# --- failure-handling endpoints ---------------------------------------------
+
+
+def test_tamper_endpoints_absent_by_default(sim_client):
+    """Attack controls must not exist unless explicitly enabled."""
+    assert sim_client.post("/demo/tamper/flip").status_code == 404
+    assert sim_client.post("/demo/reset").status_code == 404
+
+
+def test_confirm_activates_a_pending_mandate(sim_client, monkeypatch):
+    from app.compiler import AmbiguityFlag
+    from tests.test_compiler import make_draft
+
+    draft = make_draft(
+        ambiguities=[
+            AmbiguityFlag(
+                field="merchant_allowlist",
+                issue="no merchant named",
+                assumed_value="zepto",
+                clarifying_question="Which merchants?",
+            )
+        ]
+    )
+    monkeypatch.setattr("app.compiler.compile_policy", lambda *a, **k: draft)
+
+    body = sim_client.post("/compile", json={"text": "spend 500 a week"}).json()
+    assert body["mandate"]["status"] == "pending_confirmation"
+    assert body["ambiguities"][0]["blocking"] is True
+
+    mandate_id = body["mandate"]["id"]
+    confirmed = sim_client.post(f"/mandates/{mandate_id}/confirm").json()
+    assert confirmed["status"] == "active"
+
+
+def test_amend_endpoint_corrects_and_resigns(sim_client, monkeypatch):
+    from tests.test_compiler import make_draft
+
+    monkeypatch.setattr("app.compiler.compile_policy", lambda *a, **k: make_draft())
+    mandate_id = sim_client.post("/compile", json={"text": "zepto"}).json()["mandate"]["id"]
+
+    body = sim_client.post(
+        f"/mandates/{mandate_id}/amend",
+        json={"changes": {"merchant_allowlist": ["blinkit"]}},
+    ).json()
+
+    assert body["mandate"]["merchant_allowlist"] == ["blinkit"]
+    assert body["mandate"]["version"] == 2
+    assert body["mandate"]["signature_valid"] is True
+
+
+def test_amend_endpoint_rejects_an_incoherent_correction(sim_client, monkeypatch):
+    from tests.test_compiler import make_draft
+
+    monkeypatch.setattr("app.compiler.compile_policy", lambda *a, **k: make_draft())
+    mandate_id = sim_client.post("/compile", json={"text": "zepto"}).json()["mandate"]["id"]
+
+    response = sim_client.post(
+        f"/mandates/{mandate_id}/amend", json={"changes": {"merchant_allowlist": []}}
+    )
+    assert response.status_code == 400
+    assert "empty" in response.json()["detail"]
+
+
+def test_amend_endpoint_refuses_non_amendable_fields(sim_client, monkeypatch):
+    from tests.test_compiler import make_draft
+
+    monkeypatch.setattr("app.compiler.compile_policy", lambda *a, **k: make_draft())
+    mandate_id = sim_client.post("/compile", json={"text": "zepto"}).json()["mandate"]["id"]
+
+    response = sim_client.post(
+        f"/mandates/{mandate_id}/amend", json={"changes": {"principal_id": "someone-else"}}
+    )
+    assert response.status_code == 400
+    assert "not amendable" in response.json()["detail"]
+
+
+def test_amend_unknown_mandate_is_404(sim_client):
+    assert sim_client.post(
+        "/mandates/nope/amend", json={"changes": {"frequency_cap": 3}}
+    ).status_code == 404

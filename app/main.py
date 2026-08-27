@@ -1,4 +1,5 @@
 import json
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -86,12 +87,17 @@ def compile_endpoint(body: CompileRequest, session: Session = Depends(get_sessio
         "validity_days": draft.validity_days,
         "interpretation_notes": draft.interpretation_notes,
     }
+    from app.compiler import CRITICAL_AMBIGUITY_FIELDS
+
     ambiguities = [
         {
             "field": a.field,
             "issue": a.issue,
             "assumed_value": a.assumed_value,
             "clarifying_question": a.clarifying_question,
+            # A critical ambiguity holds the mandate in pending_confirmation
+            # rather than letting it start authorising payments on a guess.
+            "blocking": a.field.strip() in CRITICAL_AMBIGUITY_FIELDS,
         }
         for a in draft.ambiguities
     ]
@@ -145,9 +151,102 @@ def list_mandates(session: Session = Depends(get_session)):
     ]
 
 
+class AmendRequest(BaseModel):
+    changes: dict
+    activate: bool = True
+
+
+@app.post("/mandates/{mandate_id}/amend")
+def amend(
+    mandate_id: str,
+    body: AmendRequest,
+    session: Session = Depends(get_session),
+):
+    """Correct a term the compiler guessed at. Bumps version and re-signs."""
+    from app.amend import AmendmentError, amend_mandate
+
+    try:
+        mandate = amend_mandate(
+            session, mandate_id, body.changes, activate=body.activate
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except AmendmentError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"status": mandate.status.value, "mandate": _mandate_view(mandate)}
+
+
+@app.post("/mandates/{mandate_id}/confirm")
+def confirm(mandate_id: str, session: Session = Depends(get_session)):
+    """Accept the compiler's assumptions unchanged and make the mandate live."""
+    from app.amend import AmendmentError, confirm_mandate
+
+    try:
+        mandate = confirm_mandate(session, mandate_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except AmendmentError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"status": mandate.status.value, "mandate": _mandate_view(mandate)}
+
+
+# Destructive demo scaffolding: corrupting the audit log on purpose, and wiping
+# it to retake a demo. Registered only when explicitly enabled, so neither can
+# ship on by accident.
+TAMPER_ENABLED = os.environ.get("MANDATE_DEMO_TAMPER") == "1"
+
+if TAMPER_ENABLED:
+
+    @app.post("/demo/reset")
+    def demo_reset(session: Session = Depends(get_session)):
+        """Wipe every mandate, transaction and audit entry.
+
+        Each attack is shown on a clean chain: verification reports the FIRST
+        break, so without a reset a second attack would still point at the
+        first one's damage.
+        """
+        from sqlalchemy import text as _text
+
+        # Quoted: "transaction" is a reserved SQL keyword. Deleted in FK order,
+        # decisions first.
+        for table in ("decision", "transaction", "mandate"):
+            session.execute(_text(f'DELETE FROM "{table}"'))
+        session.commit()
+        return {"reset": True, "chain": str(verify_chain(session))}
+
+    @app.post("/demo/tamper/{attack}")
+    def demo_tamper(attack: str, session: Session = Depends(get_session)):
+        """Corrupt the audit log on purpose, then let /audit/verify catch it."""
+        from app.tamper import ATTACKS, TamperUnavailable
+
+        if attack not in ATTACKS:
+            raise HTTPException(
+                status_code=404,
+                detail=f"unknown attack '{attack}'; try {sorted(ATTACKS)}",
+            )
+        try:
+            result = ATTACKS[attack](session)
+        except TamperUnavailable as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+        report = verify_chain(session)
+        return {
+            "attack": result.attack,
+            "seq": result.seq,
+            "description": result.description,
+            "before": result.before,
+            "after": result.after,
+            "detected": not report.valid,
+            "broken_at_seq": report.broken_at_seq,
+            "reason": report.reason,
+        }
+
+
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    # `demo_tamper` tells the dashboard whether to show the tamper panel, so
+    # the attack controls cannot appear against a server that has them off.
+    return {"status": "ok", "demo_tamper": TAMPER_ENABLED}
 
 
 @app.get("/audit/verify")

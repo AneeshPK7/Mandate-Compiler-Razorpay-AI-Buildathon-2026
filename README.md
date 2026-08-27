@@ -213,6 +213,74 @@ A mandate compiled from English can be run against the same traffic via
 (they were computed against the demo mandate's terms), so that path is for
 demonstration; `tests/test_dataset.py` remains the labelled check.
 
+## Two failures, handled
+
+### 1. The compiler isn't sure it understood
+
+Ambiguity flags are not merely advisory. If the compiler had to guess at a
+term that **bounds how much money can move or where it can go** —
+`merchant_allowlist`, `category_exclusions`, either amount cap, or `period` —
+the mandate is created in `pending_confirmation`: signed and stored, but not
+enforceable. The engine blocks every transaction against it with
+`MANDATE_NOT_CONFIRMED`.
+
+The system declines to act on a policy it isn't confident it understood,
+rather than guessing and hoping. Guesses about the time window or validity
+period are recorded but don't block — not every uncertainty is worth stopping
+the world for.
+
+Resolving it takes one of two paths, both audited:
+
+- **Confirm** — accept the assumption; mandate goes active, `MANDATE_CONFIRMED`
+  lands in the chain.
+- **Amend** — correct the term; `version` bumps, the mandate is **re-signed**,
+  and `MANDATE_AMENDED` lands in the chain. Because `version` is inside the
+  signed payload, an amended mandate is cryptographically distinguishable from
+  the original instead of quietly overwriting it.
+
+The validation gate applies to people too: a human resolving a guess still
+cannot write a cap of zero, an empty allowlist, or a per-transaction cap above
+the period cap. `id`, `principal_id`, `status`, `version` and `signature` are
+not amendable at all — changing those would be a different grant, not a
+correction.
+
+### 2. Someone edits the audit log
+
+```bash
+MANDATE_DEMO_TAMPER=1 uvicorn app.main:app
+```
+
+Three attacks, each writing to the database with **raw SQL** — going through
+the ORM would maintain the chain and prove nothing. Each produces its own
+distinct detection:
+
+| Attack | What verification says |
+|---|---|
+| Flip a `BLOCK` to `ALLOW` | `content altered` at the edited entry |
+| Delete an entry | `sequence gap: expected seq 16, found 17 (1 entry missing)` |
+| Forge the hash after editing | `broken link` at the **next** entry |
+
+The third is the interesting one. The attacker edits an entry *and* recomputes
+its hash, so that entry now verifies against itself — and detection falls
+entirely to the chain link from its successor, which still points at the old
+hash.
+
+Verification reports the **first** break, so a second attack would still point
+at the first one's damage. `POST /demo/reset` wipes everything for a clean
+retake.
+
+Both the tamper and reset endpoints are registered **only** when
+`MANDATE_DEMO_TAMPER=1`, so they cannot ship on by accident, and the dashboard
+hides the panel unless `/health` reports it enabled. A test asserts both are
+404 by default.
+
+**Honest limitation:** the chain detects tampering, not a *full rewrite*. An
+attacker who can write to the database and recompute every hash forward from
+the point of tampering would produce a self-consistent chain. Catching that
+needs the head hash anchored somewhere they can't reach — published, or
+counter-signed. `chain_head` exists for exactly that; wiring it to an external
+anchor is future work.
+
 ## Status
 
 - **Day 1** — core schemas (`Mandate`, `Transaction`, `Decision`), FastAPI/SQLite skeleton.
@@ -227,7 +295,9 @@ demonstration; `tests/test_dataset.py` remains the labelled check.
 - **Day 6** — SSE streaming simulator, mandate lifecycle events in the audit
   chain, live revocation verified mid-stream.
 - **Day 7** — single-page dashboard: compile → mandate + ambiguity flags →
-  live streaming decisions → revoke → audit viewer. 212 tests.
+  live streaming decisions → revoke → audit viewer.
+- **Day 8** — deliberate failure handling: unconfirmed mandates fail closed
+  with confirm/amend resolution, and three raw-SQL tamper attacks each caught
+  with a distinct signature. 262 tests.
 
-Deliberate failure handling and the architecture write-up land next per the
-plan in CONTEXT.md.
+The architecture write-up and pitch video land next per the plan in CONTEXT.md.

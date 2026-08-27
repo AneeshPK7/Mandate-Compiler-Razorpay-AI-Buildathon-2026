@@ -20,6 +20,7 @@ from app.models import DecisionResult, Mandate, MandateStatus, Period, Transacti
 class ReasonCode:
     ALLOWED = "ALLOWED"
     MANDATE_REVOKED = "MANDATE_REVOKED"
+    MANDATE_NOT_CONFIRMED = "MANDATE_NOT_CONFIRMED"
     MANDATE_EXPIRED = "MANDATE_EXPIRED"
     MANDATE_NOT_YET_VALID = "MANDATE_NOT_YET_VALID"
     AMOUNT_CAP_EXCEEDED = "AMOUNT_CAP_EXCEEDED"
@@ -141,6 +142,15 @@ def evaluate(
             ReasonCode.MANDATE_REVOKED,
             "status",
             "mandate was revoked by the principal",
+        )
+    # An unconfirmed mandate fails closed. It is reported before expiry so the
+    # reason names the real problem: it was never enforceable to begin with.
+    if mandate.status is MandateStatus.pending_confirmation:
+        return EngineDecision(
+            DecisionResult.block,
+            ReasonCode.MANDATE_NOT_CONFIRMED,
+            "status",
+            "compiler flagged an ambiguous field; awaiting human confirmation",
         )
     if mandate.status is MandateStatus.expired:
         return EngineDecision(
