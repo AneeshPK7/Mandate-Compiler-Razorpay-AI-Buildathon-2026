@@ -86,6 +86,7 @@ audit chain, simulator, revocation — runs without it, and the dashboard report
 the compiler as unavailable rather than failing.
 
 ```bash
+python scripts/preflight.py                      # runs the whole demo, prints GO/NO-GO
 python -m pytest tests/ -q                       # 262 tests
 python scripts/generate_data.py --verify         # 275 labelled txns vs the engine
 python scripts/eval_compiler.py                  # 15 NL cases (needs API key)
@@ -378,6 +379,7 @@ scripts/
   generate_data.py   generate / export / verify the dataset
   eval_compiler.py   15-case NL compiler eval
   demo_chain.py      end-to-end: sign, decide, tamper, detect
+  preflight.py       pre-recording check: the full demo against a real server
 tests/             262 tests
 ```
 

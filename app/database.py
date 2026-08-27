@@ -1,6 +1,10 @@
+import os
+
 from sqlmodel import Session, SQLModel, create_engine
 
-DATABASE_URL = "sqlite:///./mandate_compiler.db"
+# Overridable so the pre-flight check can run the whole demo against a scratch
+# database instead of the one you are about to record with.
+DATABASE_URL = os.environ.get("MANDATE_DB_URL", "sqlite:///./mandate_compiler.db")
 
 engine = create_engine(DATABASE_URL, echo=False, connect_args={"check_same_thread": False})
 
