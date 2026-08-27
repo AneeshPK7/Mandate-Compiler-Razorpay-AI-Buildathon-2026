@@ -199,6 +199,47 @@ def seed_dataset(session: Session, *, sign: bool = True) -> tuple[Mandate, int]:
     return mandate, len(dataset.cases)
 
 
+def load_batch_for(session: Session, mandate_id: str) -> int:
+    """Attach a copy of the synthetic transaction batch to any mandate.
+
+    Lets a mandate compiled from English be exercised against the same traffic
+    as the demo mandate. The ground-truth labels no longer apply — they were
+    computed against the demo mandate's terms — so this is for demonstration,
+    not verification. tests/test_dataset.py remains the labelled check.
+    """
+    from app.synthetic import generate_dataset
+
+    mandate = session.get(Mandate, mandate_id)
+    if mandate is None:
+        raise LookupError(f"no mandate {mandate_id}")
+
+    existing = set(
+        session.exec(select(Transaction.id).where(Transaction.mandate_id == mandate_id))
+    )
+
+    dataset = generate_dataset()
+    added = 0
+    for case in sorted(dataset.cases, key=lambda c: c.transaction.timestamp):
+        source = case.transaction
+        txn_id = f"{mandate_id}:{source.id}"
+        if txn_id in existing:
+            continue
+        session.add(
+            Transaction(
+                id=txn_id,
+                mandate_id=mandate_id,
+                amount=source.amount,
+                merchant=source.merchant,
+                category=source.category,
+                timestamp=source.timestamp,
+            )
+        )
+        added += 1
+
+    session.commit()
+    return added
+
+
 def revoke_mandate(session: Session, mandate_id: str) -> Mandate:
     """Flip a mandate to revoked and record the transition in the audit chain."""
     from app.audit import append_mandate_event

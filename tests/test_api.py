@@ -188,3 +188,129 @@ def test_simulate_unknown_mandate_streams_an_error_event(sim_client):
     with sim_client.stream("GET", "/simulate/nope?delay_ms=0") as response:
         body = "".join(response.iter_text())
     assert "event: error" in body
+
+
+# --- dashboard --------------------------------------------------------------
+
+
+def test_dashboard_renders(sim_client):
+    response = sim_client.get("/")
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "Mandate Compiler" in response.text
+
+
+def test_dashboard_has_no_external_resources(sim_client):
+    """A CDN outage must not be able to break a live demo.
+
+    Checks actual resource references rather than substrings, so prose in the
+    page's own comments doesn't trip it.
+    """
+    import re
+
+    body = sim_client.get("/").text
+    external = re.findall(r'(?:src|href)\s*=\s*["\'](?!#)([^"\']+)', body)
+    remote = [u for u in external if u.startswith(("http:", "https:", "//"))]
+    assert remote == [], f"page loads external resources: {remote}"
+    assert "<script" in body and "<style" in body  # everything is inline
+
+
+def test_list_mandates_reports_pending_count(sim_client):
+    sim_client.post("/demo/seed")
+    rows = sim_client.get("/mandates").json()
+    assert len(rows) == 1
+    assert rows[0]["pending"] > 250
+    assert rows[0]["status"] == "active"
+
+
+def test_load_batch_attaches_transactions(sim_client):
+    """A mandate compiled from English can be run against the same traffic."""
+    from app.models import Mandate
+    from app.signing import sign_mandate
+    from tests.test_engine import make_mandate
+
+    mandate = sign_mandate(make_mandate())
+    mandate.id = "compiled-1"
+    sim_client.session.add(mandate)
+    sim_client.session.commit()
+
+    body = sim_client.post("/mandates/compiled-1/load-batch").json()
+    assert body["transactions_loaded"] > 250
+    assert body["pending"] == body["transactions_loaded"]
+
+
+def test_load_batch_is_idempotent(sim_client):
+    mandate_id = sim_client.post("/demo/seed").json()["mandate"]["id"]
+    first = sim_client.post(f"/mandates/{mandate_id}/load-batch").json()
+    second = sim_client.post(f"/mandates/{mandate_id}/load-batch").json()
+    assert second["transactions_loaded"] == 0
+    assert second["pending"] == first["pending"]
+
+
+def test_load_batch_unknown_mandate_is_404(sim_client):
+    assert sim_client.post("/mandates/nope/load-batch").status_code == 404
+
+
+def test_compile_rejects_empty_text(sim_client):
+    assert sim_client.post("/compile", json={"text": "   "}).status_code == 400
+
+
+def test_compile_without_credentials_degrades_gracefully(sim_client, monkeypatch):
+    """No API key must produce a reported status, never a 500."""
+    def boom(*args, **kwargs):
+        raise RuntimeError("Could not resolve authentication method")
+
+    monkeypatch.setattr("app.compiler.compile_policy", boom)
+    body = sim_client.post("/compile", json={"text": "spend 500 at zepto"}).json()
+    assert body["status"] == "unavailable"
+    assert "ANTHROPIC_API_KEY" in body["hint"]
+
+
+def test_compile_reports_gate_rejection_without_signing(sim_client, monkeypatch):
+    """A draft that fails the gate is reported, and no mandate is created."""
+    from tests.test_compiler import make_draft
+
+    monkeypatch.setattr(
+        "app.compiler.compile_policy",
+        lambda *a, **k: make_draft(merchant_allowlist=[]),
+    )
+    body = sim_client.post("/compile", json={"text": "spend 500 somewhere"}).json()
+
+    assert body["status"] == "rejected"
+    assert any("block all spending" in p for p in body["problems"])
+    assert "mandate" not in body
+    assert sim_client.get("/mandates").json() == []
+
+
+def test_compile_creates_a_signed_mandate(sim_client, monkeypatch):
+    from app.compiler import AmbiguityFlag
+    from tests.test_compiler import make_draft
+
+    draft = make_draft(
+        ambiguities=[
+            AmbiguityFlag(
+                field="frequency_cap",
+                issue="not stated",
+                assumed_value="10",
+                clarifying_question="How many orders per week?",
+            )
+        ]
+    )
+    monkeypatch.setattr("app.compiler.compile_policy", lambda *a, **k: draft)
+
+    body = sim_client.post("/compile", json={"text": "zepto 500 a week"}).json()
+    assert body["status"] == "compiled"
+    assert body["mandate"]["signature_valid"] is True
+    assert body["mandate"]["status"] == "active"
+    # Ambiguities are advisory: they are surfaced but do not block compilation.
+    assert body["ambiguities"][0]["field"] == "frequency_cap"
+
+
+def test_compiled_mandate_is_recorded_in_the_chain(sim_client, monkeypatch):
+    from tests.test_compiler import make_draft
+
+    monkeypatch.setattr("app.compiler.compile_policy", lambda *a, **k: make_draft())
+    sim_client.post("/compile", json={"text": "zepto 500 a week"})
+
+    log = sim_client.get("/audit/chain").json()
+    assert any(e["reason_code"] == "MANDATE_CREATED" for e in log)

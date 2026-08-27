@@ -1,21 +1,27 @@
 import json
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
+from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
 from sqlmodel import Session, select
 
-from app.audit import verify_chain
+from app.audit import append_mandate_event, verify_chain
 from app.database import create_db_and_tables, get_session
-from app.models import Decision, Mandate
-from app.signing import public_key_hex, verify_mandate
+from app.models import Decision, EventType, Mandate
+from app.signing import public_key_hex, sign_mandate, verify_mandate
 from app.simulator import (
     SimulationStep,
+    load_batch_for,
     pending_transactions,
     revoke_mandate,
     seed_dataset,
     simulate,
 )
+
+templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
 
 @asynccontextmanager
@@ -25,6 +31,118 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Mandate Compiler", lifespan=lifespan)
+
+
+@app.get("/")
+def dashboard(request: Request):
+    return templates.TemplateResponse(request, "index.html")
+
+
+class CompileRequest(BaseModel):
+    text: str
+    principal_id: str = "user-demo"
+    agent_id: str = "shopping-agent-1"
+
+
+@app.post("/compile")
+def compile_endpoint(body: CompileRequest, session: Session = Depends(get_session)):
+    """Compile English into a signed mandate, surfacing guesses and rejections.
+
+    Three outcomes, all reported rather than raised:
+      - `unavailable`: the model could not be reached (e.g. no API key)
+      - `rejected`:    the draft failed the deterministic validation gate
+      - `compiled`:    a signed mandate was created
+
+    Ambiguities never block compilation. They are the model's own flags on
+    fields it had to guess, shown so a human can resolve them.
+    """
+    from app.compiler import (
+        PAISE_PER_RUPEE,
+        compile_policy,
+        draft_to_mandate,
+        validate_draft,
+    )
+
+    try:
+        draft = compile_policy(body.text)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001 - surface, don't crash the demo
+        return {
+            "status": "unavailable",
+            "error": f"{type(exc).__name__}: {exc}",
+            "hint": "Set ANTHROPIC_API_KEY to enable the compiler.",
+        }
+
+    problems = validate_draft(draft)
+    draft_view = {
+        "amount_cap_per_txn_rupees": draft.amount_cap_per_txn_rupees,
+        "amount_cap_period_rupees": draft.amount_cap_period_rupees,
+        "period": draft.period,
+        "merchant_allowlist": draft.merchant_allowlist,
+        "category_exclusions": draft.category_exclusions,
+        "time_window": [draft.time_window_start, draft.time_window_end],
+        "frequency_cap": draft.frequency_cap,
+        "validity_days": draft.validity_days,
+        "interpretation_notes": draft.interpretation_notes,
+    }
+    ambiguities = [
+        {
+            "field": a.field,
+            "issue": a.issue,
+            "assumed_value": a.assumed_value,
+            "clarifying_question": a.clarifying_question,
+        }
+        for a in draft.ambiguities
+    ]
+
+    if problems:
+        return {
+            "status": "rejected",
+            "draft": draft_view,
+            "ambiguities": ambiguities,
+            "problems": problems,
+        }
+
+    mandate = draft_to_mandate(draft, body.principal_id, body.agent_id)
+    sign_mandate(mandate)
+    session.add(mandate)
+    session.commit()
+    session.refresh(mandate)
+    append_mandate_event(session, mandate, EventType.MANDATE_CREATED)
+
+    return {
+        "status": "compiled",
+        "draft": draft_view,
+        "ambiguities": ambiguities,
+        "problems": [],
+        "mandate": _mandate_view(mandate),
+        "paise_per_rupee": PAISE_PER_RUPEE,
+    }
+
+
+@app.post("/mandates/{mandate_id}/load-batch")
+def load_batch(mandate_id: str, session: Session = Depends(get_session)):
+    """Attach the synthetic transaction batch to a mandate so it can be run."""
+    try:
+        added = load_batch_for(session, mandate_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"transactions_loaded": added, "pending": len(pending_transactions(session, mandate_id))}
+
+
+@app.get("/mandates")
+def list_mandates(session: Session = Depends(get_session)):
+    mandates = session.exec(select(Mandate)).all()
+    return [
+        {
+            "id": m.id,
+            "principal_id": m.principal_id,
+            "status": m.status.value,
+            "pending": len(pending_transactions(session, m.id)),
+        }
+        for m in mandates
+    ]
 
 
 @app.get("/health")

@@ -189,6 +189,30 @@ seq   47  MANDATE_REVOKED     <- lands mid-stream, between decisions
 chain OK — 277 entries
 ```
 
+## Dashboard
+
+```bash
+uvicorn app.main:app --reload   # then open http://localhost:8000
+```
+
+One page, left-to-right through the whole argument: type a policy in English →
+see the compiled mandate with its Ed25519 signature and any fields the compiler
+had to guess → run the batch → watch decisions stream in with live reason-code
+counts → revoke mid-stream → verify the audit chain.
+
+Three example policies are one click away, including the two failure cases:
+one that names no merchant (must flag rather than guess) and one that is
+self-contradictory (the validation gate rejects it and nothing gets signed).
+
+**No CDN, no build step, no external fonts.** Everything is inline in a single
+template, and a test asserts the page loads zero remote resources — a network
+hiccup during a recorded demo must not be able to break it.
+
+A mandate compiled from English can be run against the same traffic via
+`POST /mandates/{id}/load-batch`. The ground-truth labels no longer apply there
+(they were computed against the demo mandate's terms), so that path is for
+demonstration; `tests/test_dataset.py` remains the labelled check.
+
 ## Status
 
 - **Day 1** — core schemas (`Mandate`, `Transaction`, `Decision`), FastAPI/SQLite skeleton.
@@ -201,6 +225,9 @@ chain OK — 277 entries
 - **Day 5** — 275-transaction labelled dataset replayed through the engine as a
   differential test.
 - **Day 6** — SSE streaming simulator, mandate lifecycle events in the audit
-  chain, live revocation verified mid-stream. 201 tests.
+  chain, live revocation verified mid-stream.
+- **Day 7** — single-page dashboard: compile → mandate + ambiguity flags →
+  live streaming decisions → revoke → audit viewer. 212 tests.
 
-The dashboard lands next per the plan in CONTEXT.md.
+Deliberate failure handling and the architecture write-up land next per the
+plan in CONTEXT.md.
