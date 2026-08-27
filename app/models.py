@@ -73,8 +73,23 @@ class Transaction(SQLModel, table=True):
     timestamp: datetime
 
 
+class EventType:
+    """What kind of thing an audit entry records."""
+
+    DECISION = "DECISION"
+    MANDATE_CREATED = "MANDATE_CREATED"
+    MANDATE_REVOKED = "MANDATE_REVOKED"
+
+
 class Decision(SQLModel, table=True):
-    """The policy engine's verdict on a Transaction, chained into the audit log.
+    """One entry in the audit chain.
+
+    Most entries are the policy engine's verdict on a Transaction, but the
+    chain also carries mandate lifecycle events. That is load-bearing rather
+    than incidental: the Ed25519 signature deliberately excludes `status` (see
+    app/signing.py), so revocation is made tamper-evident *here*. A mandate
+    silently flipped from revoked back to active in the database leaves the
+    chain without the corresponding event.
 
     `seq` is a monotonic integer rather than a UUID because the audit chain
     needs an unambiguous order and a way to notice a *missing* entry. A gap in
@@ -84,7 +99,13 @@ class Decision(SQLModel, table=True):
 
     seq: int | None = Field(default=None, primary_key=True)
     id: str = Field(default_factory=_uuid, unique=True, index=True)
-    transaction_id: str = Field(index=True, foreign_key="transaction.id")
+
+    event_type: str = Field(default=EventType.DECISION, index=True)
+    mandate_id: str | None = Field(default=None, index=True)
+    # Null for lifecycle events, which are not about any one transaction.
+    transaction_id: str | None = Field(
+        default=None, index=True, foreign_key="transaction.id"
+    )
 
     # Stored as a plain string holding a DecisionResult *value*, not as a SQL
     # enum. The audit verifier must be able to read whatever is actually in the

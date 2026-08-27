@@ -1,12 +1,21 @@
+import json
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
 
 from app.audit import verify_chain
 from app.database import create_db_and_tables, get_session
-from app.models import Decision
-from app.signing import public_key_hex
+from app.models import Decision, Mandate
+from app.signing import public_key_hex, verify_mandate
+from app.simulator import (
+    SimulationStep,
+    pending_transactions,
+    revoke_mandate,
+    seed_dataset,
+    simulate,
+)
 
 
 @asynccontextmanager
@@ -64,3 +73,95 @@ def audit_chain(limit: int = 100, session: Session = Depends(get_session)):
 def pubkey():
     """Ed25519 public key, so mandate signatures can be checked independently."""
     return {"algorithm": "Ed25519", "public_key": public_key_hex()}
+
+
+def _mandate_view(mandate: Mandate) -> dict:
+    return {
+        "id": mandate.id,
+        "principal_id": mandate.principal_id,
+        "agent_id": mandate.agent_id,
+        "amount_cap_per_txn": mandate.amount_cap_per_txn,
+        "amount_cap_period": mandate.amount_cap_period,
+        "period": mandate.period.value,
+        "merchant_allowlist": mandate.merchant_allowlist,
+        "category_exclusions": mandate.category_exclusions,
+        "time_window": [mandate.time_window_start, mandate.time_window_end],
+        "frequency_cap": mandate.frequency_cap,
+        "valid_from": mandate.valid_from,
+        "valid_until": mandate.valid_until,
+        "status": mandate.status.value,
+        "version": mandate.version,
+        "signature": mandate.signature,
+        "signature_valid": verify_mandate(mandate),
+    }
+
+
+@app.get("/mandates/{mandate_id}")
+def get_mandate(mandate_id: str, session: Session = Depends(get_session)):
+    mandate = session.get(Mandate, mandate_id)
+    if mandate is None:
+        raise HTTPException(status_code=404, detail=f"no mandate {mandate_id}")
+    return _mandate_view(mandate)
+
+
+@app.post("/demo/seed")
+def demo_seed(session: Session = Depends(get_session)):
+    """Load the synthetic dataset so the simulator has something to replay.
+
+    Idempotent: seeding twice does not duplicate the batch.
+    """
+    mandate, loaded = seed_dataset(session)
+    return {
+        "mandate": _mandate_view(mandate),
+        "transactions_loaded": loaded,
+        "pending": len(pending_transactions(session, mandate.id)),
+    }
+
+
+@app.post("/mandates/{mandate_id}/revoke")
+def revoke(mandate_id: str, session: Session = Depends(get_session)):
+    """Revoke a mandate. Takes effect on the very next evaluation.
+
+    The transition is written into the audit chain, which is what makes it
+    tamper-evident given that `status` sits outside the Ed25519 signature.
+    """
+    try:
+        mandate = revoke_mandate(session, mandate_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"status": mandate.status.value, "mandate": _mandate_view(mandate)}
+
+
+def _sse(event: str, payload: dict) -> str:
+    return f"event: {event}\ndata: {json.dumps(payload, default=str)}\n\n"
+
+
+@app.get("/simulate/{mandate_id}")
+def simulate_stream(
+    mandate_id: str,
+    delay_ms: int = 40,
+    limit: int | None = None,
+):
+    """Stream evaluation of every pending transaction as Server-Sent Events.
+
+    Each step is emitted as it is decided, so revoking mid-stream is visible
+    live: the simulator re-reads mandate status for every transaction.
+    """
+
+    def event_stream():
+        try:
+            for item in simulate(
+                mandate_id, delay_seconds=delay_ms / 1000, limit=limit
+            ):
+                if isinstance(item, SimulationStep):
+                    yield _sse("step", item.to_dict())
+                else:
+                    yield _sse("summary", item.to_dict())
+        except LookupError as exc:
+            yield _sse("error", {"detail": str(exc)})
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )

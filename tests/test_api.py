@@ -109,3 +109,82 @@ def test_chain_exposes_reason_codes(client):
         DecisionResult.allow.value,
         DecisionResult.block.value,
     }
+
+
+# --- simulator, seeding and revocation endpoints ----------------------------
+#
+# Note on streaming: Starlette's TestClient buffers a StreamingResponse, so the
+# server-side generator can run to completion before the client reads the first
+# chunk. That makes it impossible to issue a *mid-stream* revoke through
+# TestClient — the revoke would land after every transaction was already
+# decided. Mid-stream revocation is therefore covered in tests/test_simulator.py
+# by driving the generator directly, and was additionally verified end-to-end
+# against a real uvicorn server. These tests cover endpoint shape only.
+
+
+@pytest.fixture
+def sim_client(client, monkeypatch):
+    """Client whose simulator shares the test's in-memory engine."""
+    monkeypatch.setattr("app.simulator.db_engine", client.session.get_bind())
+    return client
+
+
+def test_seed_endpoint_loads_the_dataset(sim_client):
+    body = sim_client.post("/demo/seed").json()
+    assert body["transactions_loaded"] > 250
+    assert body["pending"] == body["transactions_loaded"]
+    assert body["mandate"]["signature_valid"] is True
+
+
+def test_seed_endpoint_is_idempotent(sim_client):
+    first = sim_client.post("/demo/seed").json()
+    second = sim_client.post("/demo/seed").json()
+    assert second["transactions_loaded"] == 0
+    assert second["pending"] == first["pending"]
+
+
+def test_get_mandate_returns_terms_and_signature_status(sim_client):
+    mandate_id = sim_client.post("/demo/seed").json()["mandate"]["id"]
+    body = sim_client.get(f"/mandates/{mandate_id}").json()
+    assert body["status"] == "active"
+    assert body["signature_valid"] is True
+    assert body["merchant_allowlist"]
+
+
+def test_get_unknown_mandate_is_404(sim_client):
+    assert sim_client.get("/mandates/nope").status_code == 404
+
+
+def test_revoke_endpoint_flips_status(sim_client):
+    mandate_id = sim_client.post("/demo/seed").json()["mandate"]["id"]
+    assert sim_client.post(f"/mandates/{mandate_id}/revoke").json()["status"] == "revoked"
+    assert sim_client.get(f"/mandates/{mandate_id}").json()["status"] == "revoked"
+
+
+def test_revoke_keeps_the_signature_valid(sim_client):
+    mandate_id = sim_client.post("/demo/seed").json()["mandate"]["id"]
+    body = sim_client.post(f"/mandates/{mandate_id}/revoke").json()
+    assert body["mandate"]["signature_valid"] is True
+
+
+def test_revoke_unknown_mandate_is_404(sim_client):
+    assert sim_client.post("/mandates/nope/revoke").status_code == 404
+
+
+def test_simulate_streams_sse_events(sim_client):
+    mandate_id = sim_client.post("/demo/seed").json()["mandate"]["id"]
+    with sim_client.stream(
+        "GET", f"/simulate/{mandate_id}?delay_ms=0&limit=5"
+    ) as response:
+        assert response.headers["content-type"].startswith("text/event-stream")
+        body = "".join(response.iter_text())
+
+    assert body.count("event: step") == 5
+    assert body.count("event: summary") == 1
+
+
+def test_simulate_unknown_mandate_streams_an_error_event(sim_client):
+    sim_client.post("/demo/seed")
+    with sim_client.stream("GET", "/simulate/nope?delay_ms=0") as response:
+        body = "".join(response.iter_text())
+    assert "event: error" in body

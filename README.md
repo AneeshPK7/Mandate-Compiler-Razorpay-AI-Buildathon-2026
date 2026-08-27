@@ -153,6 +153,42 @@ cap; an `hour=23` "violation" landing on 23:00, which is inside the window;
 stateful labels assigned in generation order while the engine evaluates in
 timestamp order).
 
+## Live simulation and revocation
+
+```bash
+uvicorn app.main:app --reload
+curl -X POST localhost:8000/demo/seed            # load 275 transactions
+curl -N localhost:8000/simulate/mandate-demo-001 # stream decisions (SSE)
+curl -X POST localhost:8000/mandates/mandate-demo-001/revoke
+```
+
+**Revocation takes effect on the very next transaction.** The simulator
+re-reads mandate state from the database for every single transaction, opening
+a short-lived session each iteration. Caching the mandate once at the top of
+the loop is the obvious optimisation and would quietly break the guarantee the
+whole system exists to make — a kill switch that only takes effect at the next
+batch boundary is not a kill switch.
+
+That claim is tested by mutation, not just assertion: hoisting the mandate read
+out of the loop makes `test_mid_batch_revocation_takes_effect_on_the_next_transaction`
+fail with 186 transactions slipping through. Verified end-to-end against a real
+uvicorn server too — revoke issued at t=1.55s into a 9.2s stream, 45 decisions
+before it, 226 after, every one of them `MANDATE_REVOKED`.
+
+### Revocation is chained, not just flagged
+
+The Ed25519 signature deliberately excludes `status`, so revocation is made
+tamper-evident by the audit chain instead: the transition is written into the
+log as a `MANDATE_REVOKED` entry, hashed like any other. A mandate silently
+flipped back to active in the database leaves the chain without a matching
+event.
+
+```
+seq    1  MANDATE_CREATED
+seq   47  MANDATE_REVOKED     <- lands mid-stream, between decisions
+chain OK — 277 entries
+```
+
 ## Status
 
 - **Day 1** — core schemas (`Mandate`, `Transaction`, `Decision`), FastAPI/SQLite skeleton.
@@ -163,7 +199,8 @@ timestamp order).
 - **Day 4** — Ed25519 mandate signing, hash-chained audit log with
   four-attack tamper detection, chain-verification endpoint.
 - **Day 5** — 275-transaction labelled dataset replayed through the engine as a
-  differential test. 169 tests.
+  differential test.
+- **Day 6** — SSE streaming simulator, mandate lifecycle events in the audit
+  chain, live revocation verified mid-stream. 201 tests.
 
-The simulator (SSE streaming) and live revocation land next per the plan in
-CONTEXT.md.
+The dashboard lands next per the plan in CONTEXT.md.

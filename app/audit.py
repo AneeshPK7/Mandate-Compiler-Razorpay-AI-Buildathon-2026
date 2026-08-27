@@ -33,15 +33,17 @@ from sqlmodel import Session, select
 
 from app.canonical import canonical_bytes
 from app.engine import EngineDecision
-from app.models import Decision, Transaction
+from app.models import Decision, EventType, Mandate, Transaction
 
 # The chain's anchor. Also what `chain_head` returns for an empty log.
 GENESIS_HASH = "0" * 64
 
 # Fields bound by the audit hash. `id` is excluded: it is a convenience handle,
-# not part of the attested decision.
+# not part of the attested entry.
 HASHED_FIELDS = (
     "seq",
+    "event_type",
+    "mandate_id",
     "transaction_id",
     "result",
     "reason_code",
@@ -64,34 +66,77 @@ def chain_head(session: Session) -> str:
     return last.audit_hash if last else GENESIS_HASH
 
 
-def append_decision(
+def append_event(
     session: Session,
-    transaction: Transaction,
-    outcome: EngineDecision,
+    *,
+    event_type: str,
+    mandate_id: str | None = None,
+    transaction_id: str | None = None,
+    result: str = "",
+    reason_code: str = "",
+    rule_triggered: str = "",
 ) -> Decision:
-    """Record an engine verdict as the next link in the chain.
+    """Append any entry to the chain. The single write path into the audit log.
 
     Commits twice by necessity: `seq` is assigned by the database and is part
     of the hashed payload, so the row must exist before its hash can be
     computed.
     """
-    decision = Decision(
+    entry = Decision(
+        event_type=event_type,
+        mandate_id=mandate_id,
+        transaction_id=transaction_id,
+        result=result,
+        reason_code=reason_code,
+        rule_triggered=rule_triggered,
+        prev_hash=chain_head(session),
+        audit_hash="",  # placeholder until seq is assigned
+    )
+    session.add(entry)
+    session.commit()
+    session.refresh(entry)
+
+    entry.audit_hash = compute_hash(entry)
+    session.add(entry)
+    session.commit()
+    session.refresh(entry)
+    return entry
+
+
+def append_decision(
+    session: Session,
+    transaction: Transaction,
+    outcome: EngineDecision,
+) -> Decision:
+    """Record an engine verdict as the next link in the chain."""
+    return append_event(
+        session,
+        event_type=EventType.DECISION,
+        mandate_id=transaction.mandate_id,
         transaction_id=transaction.id,
         result=outcome.result.value,
         reason_code=outcome.reason_code,
         rule_triggered=outcome.rule_triggered,
-        prev_hash=chain_head(session),
-        audit_hash="",  # placeholder until seq is assigned
     )
-    session.add(decision)
-    session.commit()
-    session.refresh(decision)
 
-    decision.audit_hash = compute_hash(decision)
-    session.add(decision)
-    session.commit()
-    session.refresh(decision)
-    return decision
+
+def append_mandate_event(
+    session: Session,
+    mandate: Mandate,
+    event_type: str,
+) -> Decision:
+    """Record a mandate lifecycle event (creation, revocation) in the chain.
+
+    This is what makes status transitions tamper-evident despite `status`
+    being outside the Ed25519 signature — see app/signing.py.
+    """
+    return append_event(
+        session,
+        event_type=event_type,
+        mandate_id=mandate.id,
+        reason_code=event_type,
+        rule_triggered="mandate_lifecycle",
+    )
 
 
 @dataclass
