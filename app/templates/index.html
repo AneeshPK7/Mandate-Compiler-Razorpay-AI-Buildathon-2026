@@ -7,21 +7,27 @@
 <!--
   Everything is inline on purpose: no CDN, no build step, no webfonts. A test
   asserts this page loads zero external resources, because a network hiccup
-  during a live demo must not be able to break it. That rules out Google Fonts,
-  so the display face is Georgia — universally present and with real character
-  at large sizes.
+  during a live demo must not be able to break it. That rules out webfonts, so
+  the display face is a stock serif stack — Iowan Old Style or Palatino where
+  present, Georgia everywhere else. Financial documents are set in serif; the
+  register is deliberate.
 
-  The layout is the architecture: an amber zone where the model works, a
-  labelled trust boundary, then the deterministic engine and the audit chain.
+  Trading-desk palette: warm near-black rather than blue-black, parchment text,
+  amber as the dominant signal, jade and crimson reserved for verdicts. The
+  audit zone is the one cool ground on the page, because verification is the
+  one thing on it that isn't the desk's own opinion.
+
+  The layout is the architecture: an amber zone where the model works, then the
+  deterministic engine and the audit chain.
 -->
 <style>
   :root {
-    --ground:#07080b; --surface:#0c0e13; --raised:#0e1116;
-    --line:#161b23; --hair:#12161d; --edge:#212936;
-    --text:#e8ebf0; --dim:#8b93a3; --faint:#59606e; --ghost:#3f4653; --mute:#2c3441;
-    --mint:#3ddc97; --coral:#ff6b6b; --amber:#e8b04b; --indigo:#7c9cf5;
-    --violet:#c98ae0; --rust:#ff8f6b;
-    --serif: Georgia, "Iowan Old Style", "Times New Roman", serif;
+    --ground:#0a0907; --surface:#100e0b; --raised:#15120e;
+    --line:#241f18; --hair:#1a1610; --edge:#332c21;
+    --text:#f2ebdd; --dim:#9a8d76; --faint:#6e6353; --ghost:#4d4438; --mute:#4a4034;
+    --mint:#4fa87c; --coral:#d4544f; --amber:#e0a33d; --indigo:#8195bd;
+    --violet:#a88fc4; --rust:#cf7a4a;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
     --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   }
@@ -35,13 +41,16 @@
   ::-webkit-scrollbar { width: 8px; height: 8px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--edge); border-radius: 4px; }
-  ::-webkit-scrollbar-thumb:hover { background: #303a4a; }
+  ::-webkit-scrollbar-thumb:hover { background: #443a2c; }
 
   /* ---------- shell ---------- */
   .shell { display: flex; flex-direction: column; height: 100vh; }
   .masthead {
     display: flex; align-items: center; gap: 18px; padding: 0 26px;
-    height: 54px; border-bottom: 1px solid var(--line); flex-shrink: 0;
+    height: 54px; flex-shrink: 0;
+    /* Double rule — the masthead device of a financial broadsheet. */
+    border-bottom: 1px solid var(--line);
+    box-shadow: 0 3px 0 -2px var(--hair);
   }
   .brand { display: flex; align-items: baseline; gap: 9px; }
   .brand b { font: 400 21px var(--serif); letter-spacing: .01em; }
@@ -70,7 +79,7 @@
     border-bottom: 1px solid var(--line); flex-shrink: 0;
     transition: background .4s;
   }
-  .band.revoked { background: linear-gradient(180deg, rgba(255,107,107,.05), transparent); }
+  .band.revoked { background: linear-gradient(180deg, rgba(212,84,79,.05), transparent); }
   .band > div { padding: 22px 26px; }
   .band .state, .band .burn { border-right: 1px solid var(--line); }
   .cap {
@@ -80,10 +89,10 @@
   .statusline { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
   .beacon {
     width: 9px; height: 9px; border-radius: 50%; background: var(--mint);
-    box-shadow: 0 0 14px rgba(61,220,151,.5); flex-shrink: 0;
+    box-shadow: 0 0 14px rgba(79,168,124,.5); flex-shrink: 0;
   }
-  .beacon.bad { background: var(--coral); box-shadow: 0 0 14px rgba(255,107,107,.55); }
-  .beacon.wait { background: var(--amber); box-shadow: 0 0 14px rgba(232,176,75,.5); }
+  .beacon.bad { background: var(--coral); box-shadow: 0 0 14px rgba(212,84,79,.55); }
+  .beacon.wait { background: var(--amber); box-shadow: 0 0 14px rgba(224,163,61,.5); }
   #statusWord { font: 400 38px/1 var(--serif); letter-spacing: -.01em; }
   #statusNote { font-size: 12.5px; color: var(--dim); margin-top: 10px; }
 
@@ -103,21 +112,21 @@
   .killwrap { display: flex; flex-direction: column; justify-content: center; gap: 9px; }
   .kill {
     display: flex; align-items: center; gap: 12px; padding: 15px 17px;
-    border-radius: 10px; background: #1c0e11; border: 1px solid #4a1c22;
+    border-radius: 10px; background: #1d0f0c; border: 1px solid #4d211c;
     cursor: pointer; user-select: none; transition: background .18s, border-color .18s;
   }
-  .kill:hover:not(.spent) { background: #241216; border-color: #5c2229; }
-  .kill.spent { background: #120a0c; border-color: #2a1216; cursor: default; }
-  .kill b { display: block; font-size: 14px; font-weight: 600; color: #ff8080; }
-  .kill em { display: block; font-style: normal; font-size: 11px; color: #96585c; margin-top: 2px; }
-  .kill.spent b { color: #6d4a4a; } .kill.spent em { color: #3f2a2d; }
+  .kill:hover:not(.spent) { background: #26130f; border-color: #5e2822; }
+  .kill.spent { background: #150c09; border-color: #2c1610; cursor: default; }
+  .kill b { display: block; font-size: 14px; font-weight: 600; color: #e0736c; }
+  .kill em { display: block; font-style: normal; font-size: 11px; color: #8a5b52; margin-top: 2px; }
+  .kill.spent b { color: #6b4f47; } .kill.spent em { color: #43302a; }
   .killnote { font-size: 10.5px; color: var(--ghost); text-align: center; line-height: 1.45; }
 
   /* ---------- working surface ---------- */
   .surface { display: grid; grid-template-columns: 330px 1fr 292px; flex: 1; min-height: 0; }
   .zone { display: flex; flex-direction: column; min-height: 0; }
-  .zone.llm { background: #090a0e; border-right: 1px solid var(--line); }
-  .zone.audit { background: #080a0f; border-left: 1px solid var(--line); }
+  .zone.llm { background: #0f0c08; border-right: 1px solid var(--line); }
+  .zone.audit { background: #0b0b0e; border-left: 1px solid var(--line); }
   .zonehead { display: flex; align-items: center; gap: 9px; padding: 15px 24px 0; flex-shrink: 0; }
   .zonehead .tick { width: 14px; height: 1px; }
   .zonehead span {
@@ -127,23 +136,23 @@
 
   textarea {
     width: 100%; min-height: 92px; resize: vertical; padding: 12px 13px;
-    background: #14100b; color: #ede7db; border: 1px solid #33280f;
+    background: #16110a; color: #ece2ce; border: 1px solid #3a2c11;
     border-radius: 9px; font: 400 15px/1.6 var(--serif);
   }
-  textarea:focus { outline: 1px solid #6b5520; outline-offset: 0; }
+  textarea:focus { outline: 1px solid #75601f; outline-offset: 0; }
   .btnrow { display: flex; gap: 7px; }
   button {
     background: transparent; color: var(--text); cursor: pointer;
     border: 1px solid var(--edge); border-radius: 7px;
     padding: 8px 14px; font: 500 12.5px var(--sans); transition: background .15s, border-color .15s;
   }
-  button:hover:not(:disabled) { background: var(--raised); border-color: #303a4a; }
+  button:hover:not(:disabled) { background: var(--raised); border-color: #443a2c; }
   button:disabled { opacity: .38; cursor: not-allowed; }
   button:focus-visible, textarea:focus-visible { outline: 2px solid var(--indigo); outline-offset: 1px; }
-  button.gold { background: #b07d28; border-color: #b07d28; color: #17130a; flex: 1; }
-  button.gold:hover:not(:disabled) { background: #c48c2d; border-color: #c48c2d; }
-  button.blue { background: #1a2f57; border-color: #26437a; color: #cfe0ff; }
-  button.blue:hover:not(:disabled) { background: #21396a; }
+  button.gold { background: #b58a2e; border-color: #b58a2e; color: #14100a; flex: 1; }
+  button.gold:hover:not(:disabled) { background: #cb9c38; border-color: #cb9c38; }
+  button.blue { background: #1c2536; border-color: #33445f; color: #cbd6e8; }
+  button.blue:hover:not(:disabled) { background: #253147; }
 
   .examples { display: flex; flex-direction: column; gap: 4px; }
   .examples button {
@@ -154,7 +163,7 @@
   .examples i { width: 5px; height: 5px; border-radius: 50%; margin-top: 6px; flex-shrink: 0; }
 
   .quote {
-    font: italic 400 16px/1.55 var(--serif); color: #d5dae3; letter-spacing: .004em;
+    font: italic 400 16px/1.55 var(--serif); color: #ddd3c0; letter-spacing: .004em;
   }
   .sep { display: flex; align-items: center; gap: 8px; }
   .sep .ln { height: 1px; flex: 1; background: var(--line); }
@@ -164,29 +173,29 @@
   .term dt { font-size: 12.5px; color: var(--dim); }
   .term dd { margin: 0; font: 400 12.5px var(--mono); text-align: right; }
 
-  .seal { padding: 12px 14px; border: 1px solid #17202c; border-radius: 10px; background: #0b0f15; }
+  .seal { padding: 12px 14px; border: 1px solid #2a2519; border-radius: 10px; background: #100f0c; }
   .sealrow { display: flex; align-items: center; gap: 10px; }
-  .sealrow b { display: block; font-size: 12px; font-weight: 400; color: #b6becb; }
+  .sealrow b { display: block; font-size: 12px; font-weight: 400; color: #c3b69d; }
   .sealrow code { display: block; font: 400 10px var(--mono); color: var(--ghost); margin-top: 2px; }
   .sealnote { font-size: 10.5px; color: var(--faint); margin-top: 9px; padding-top: 9px; border-top: 1px solid var(--hair); line-height: 1.5; }
 
   .notice { display: flex; align-items: flex-start; gap: 11px; padding: 12px 14px; border-radius: 9px; font-size: 12.5px; line-height: 1.55; }
   .notice svg { flex-shrink: 0; margin-top: 1px; }
-  .notice.ok   { background: rgba(61,220,151,.06); border: 1px solid rgba(61,220,151,.22); }
-  .notice.warn { background: rgba(232,176,75,.06); border: 1px solid rgba(232,176,75,.24); }
-  .notice.bad  { background: rgba(255,107,107,.06); border: 1px solid rgba(255,107,107,.24); }
+  .notice.ok   { background: rgba(79,168,124,.06); border: 1px solid rgba(79,168,124,.22); }
+  .notice.warn { background: rgba(224,163,61,.06); border: 1px solid rgba(224,163,61,.24); }
+  .notice.bad  { background: rgba(212,84,79,.06); border: 1px solid rgba(212,84,79,.24); }
   .notice b { display: block; font-size: 13px; margin-bottom: 3px; }
   .notice.ok b { color: var(--mint); } .notice.warn b { color: var(--amber); } .notice.bad b { color: var(--coral); }
-  .notice p { margin: 0; color: #a3abb9; }
-  .problem { font: 400 11.5px/1.55 var(--mono); color: #f0a6a6; background: #16090c; border: 1px solid #3d1418; border-radius: 7px; padding: 9px 11px; margin-top: 7px; word-break: break-word; }
+  .notice p { margin: 0; color: #a89b83; }
+  .problem { font: 400 11.5px/1.55 var(--mono); color: #e0a49e; background: #180b08; border: 1px solid #421812; border-radius: 7px; padding: 9px 11px; margin-top: 7px; word-break: break-word; }
 
-  .flag { padding: 12px 14px; background: #1c1710; border-left: 3px solid var(--amber); border-radius: 0 8px 8px 0; }
+  .flag { padding: 12px 14px; background: #1d1710; border-left: 3px solid var(--amber); border-radius: 0 8px 8px 0; }
   .flag.block { border-left-color: var(--coral); }
   .flag .fname { font: 400 11.5px var(--mono); color: var(--amber); }
   .flag.block .fname { color: var(--coral); }
-  .flag .chip { padding: 1px 7px; border-radius: 20px; font-size: 10px; font-weight: 600; background: rgba(255,107,107,.15); color: var(--coral); margin-left: 7px; }
-  .flag .issue { font-size: 12.5px; color: #d8cfbe; margin-top: 5px; }
-  .flag .ask { font: italic 400 15px/1.5 var(--serif); color: #d5dae3; margin-top: 8px; }
+  .flag .chip { padding: 1px 7px; border-radius: 20px; font-size: 10px; font-weight: 600; background: rgba(212,84,79,.15); color: var(--coral); margin-left: 7px; }
+  .flag .issue { font-size: 12.5px; color: #d6c9ae; margin-top: 5px; }
+  .flag .ask { font: italic 400 15px/1.5 var(--serif); color: #ddd3c0; margin-top: 8px; }
   input[type=text] {
     flex: 1; min-width: 0; padding: 8px 10px; background: var(--raised); color: var(--text);
     border: 1px solid var(--edge); border-radius: 6px; font: 400 13px var(--sans);
@@ -222,8 +231,8 @@
   .cols div { font: 500 9.5px var(--mono); letter-spacing: .13em; text-transform: uppercase; color: var(--ghost); }
   .cols .r, .row .r { text-align: right; }
   .scroll { flex: 1; overflow-y: auto; min-height: 0; }
-  .row { height: 33px; border-bottom: 1px solid #0e1116; }
-  .row.block { background: rgba(255,107,107,.028); }
+  .row { height: 33px; border-bottom: 1px solid #15120e; }
+  .row.block { background: rgba(212,84,79,.028); }
   .row.fresh { animation: fresh .38s cubic-bezier(.16,.84,.3,1); }
   @keyframes fresh { from { opacity:0; transform: translateY(-7px);} to { opacity:1; transform:none; } }
   .row .seq, .row .when { font: 400 11px var(--mono); color: var(--ghost); }
@@ -231,7 +240,7 @@
   .row .m { font-size: 12.5px; }
   .row .c { font-size: 12.5px; color: var(--dim); }
   .row .amt { font: 400 12.5px var(--mono); padding-right: 18px; }
-  .row.block .amt { color: #6d7481; }
+  .row.block .amt { color: #6e6353; }
   .row .verdict { display: flex; align-items: center; gap: 7px; }
   .row .verdict i { width: 3px; height: 13px; border-radius: 2px; }
   .row .verdict span { font: 600 10.5px var(--mono); letter-spacing: .06em; }
@@ -243,8 +252,8 @@
   .empty span { font-size: 12px; color: var(--ghost); }
 
   /* ---------- chain ---------- */
-  .chainstate { display: flex; align-items: center; gap: 11px; padding: 12px 14px; border-radius: 10px; background: #0b0f15; border: 1px solid #17202c; }
-  .chainstate.bad { background: #16090c; border-color: #3d1418; animation: trip .5s cubic-bezier(.36,.07,.19,.97); }
+  .chainstate { display: flex; align-items: center; gap: 11px; padding: 12px 14px; border-radius: 10px; background: #100f0c; border: 1px solid #2a2519; }
+  .chainstate.bad { background: #180b08; border-color: #421812; animation: trip .5s cubic-bezier(.36,.07,.19,.97); }
   @keyframes trip { 0%,100%{transform:none} 20%{transform:translateX(-5px)} 45%{transform:translateX(4px)} 70%{transform:translateX(-2px)} }
   .chainstate b { display: block; font-size: 13px; color: var(--mint); }
   .chainstate.bad b { color: var(--coral); }
@@ -259,13 +268,13 @@
   .blk .top b { font-size: 11.5px; font-weight: 500; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .blk .top span { font: 400 10px var(--mono); color: var(--ghost); margin-left: auto; }
   .blk code { display: block; font: 400 9.5px var(--mono); color: var(--mute); margin-top: 2px; }
-  .blk.bad i { background: var(--coral); } .blk.bad .ln { background: #3d1418; }
+  .blk.bad i { background: var(--coral); } .blk.bad .ln { background: #421812; }
   .blk.bad .top b { color: var(--coral); } .blk.bad code { color: var(--coral); }
   .blk.life i { background: var(--amber); } .blk.life .top b { color: var(--amber); }
   .chainfoot { padding: 13px 20px 18px; border-top: 1px solid var(--hair); display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
   .attacks { display: flex; gap: 6px; }
-  .attacks button { flex: 1; padding: 7px 4px; font-size: 10.5px; border-color: #241318; color: #a86a6a; }
-  .attacks button:hover:not(:disabled) { background: #16090c; border-color: #3a1c22; }
+  .attacks button { flex: 1; padding: 7px 4px; font-size: 10.5px; border-color: #2a1611; color: #a86f66; }
+  .attacks button:hover:not(:disabled) { background: #180b08; border-color: #40201a; }
   [hidden] { display: none !important; }
 </style>
 </head>
@@ -279,7 +288,7 @@
     <div class="vr"></div>
     <div style="display:flex;align-items:center;gap:9px">
       <span style="font-size:12px;color:var(--faint)">agent</span>
-      <span class="num" id="agentId" style="font:400 12px var(--mono);color:#b6becb">—</span>
+      <span class="num" id="agentId" style="font:400 12px var(--mono);color:#c3b69d">—</span>
     </div>
     <div class="grow"></div>
     <div class="rail" id="rail">
@@ -316,13 +325,13 @@
           <svg viewBox="0 0 320 44" preserveAspectRatio="none" style="width:100%;height:44px;display:block">
             <defs>
               <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="#3ddc97" stop-opacity=".26" id="fadeTop"></stop>
-                <stop offset="100%" stop-color="#3ddc97" stop-opacity="0" id="fadeBot"></stop>
+                <stop offset="0%" stop-color="#4fa87c" stop-opacity=".26" id="fadeTop"></stop>
+                <stop offset="100%" stop-color="#4fa87c" stop-opacity="0" id="fadeBot"></stop>
               </linearGradient>
             </defs>
-            <line x1="0" y1="43" x2="320" y2="43" stroke="#1e242e" stroke-width="1"></line>
+            <line x1="0" y1="43" x2="320" y2="43" stroke="#2a2419" stroke-width="1"></line>
             <path id="sparkArea" d="" fill="url(#fade)"></path>
-            <path id="sparkLine" d="" fill="none" stroke="#3ddc97" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"></path>
+            <path id="sparkLine" d="" fill="none" stroke="#4fa87c" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"></path>
           </svg>
           <div class="sparkfoot"><span>period start</span><span id="sparkRight">now</span></div>
         </div>
@@ -331,7 +340,7 @@
 
     <div class="killwrap">
       <div class="kill spent" id="killBtn">
-        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#6d4a4a" stroke-width="2" stroke-linecap="round" id="killIcon">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#6b4f47" stroke-width="2" stroke-linecap="round" id="killIcon">
           <path d="M12 3.5v8.5"></path><path d="M6.8 6.6a8 8 0 1010.4 0"></path>
         </svg>
         <div><b id="killLabel">Revoke mandate</b><em id="killSub">No mandate loaded</em></div>
@@ -395,7 +404,7 @@
           </div>
           <div class="seal">
             <div class="sealrow">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#3ddc97" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" id="sealIcon">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#4fa87c" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" id="sealIcon">
                 <path d="M12 2.8l7 3v5.1c0 4.2-2.9 7.8-7 9-4.1-1.2-7-4.8-7-9V5.8z"></path><path d="M9.3 12l1.9 1.9L15 10"></path>
               </svg>
               <div style="flex:1;min-width:0"><b id="sealText">Signed · Ed25519</b><code id="sealHash"></code></div>
@@ -435,7 +444,7 @@
 
       <div class="scroll" id="scroll">
         <div class="empty" id="empty">
-          <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#232a35" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#332c21" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M3 12h4l2.5-6 4 12L16 12h5"></path>
           </svg>
           <div style="text-align:center">
@@ -456,7 +465,7 @@
 
       <div style="padding:13px 20px 0;flex-shrink:0">
         <div class="chainstate" id="chainState">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3ddc97" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" id="chainIcon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4fa87c" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" id="chainIcon">
             <path d="M20 6L9 17l-5-5"></path>
           </svg>
           <div style="min-width:0"><b id="chainTitle">Chain empty</b><code id="chainMeta">nothing recorded yet</code></div>
@@ -488,13 +497,13 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">
 const inr = p => "₹" + Math.round(p / 100).toLocaleString("en-IN");
 
 const REASON_COLOR = {
-  ALLOWED: "#3ddc97", MANDATE_REVOKED: "#ff6b6b", MANDATE_NOT_CONFIRMED: "#e8b04b",
-  MERCHANT_NOT_ALLOWED: "#ff8f6b", CATEGORY_EXCLUDED: "#e8b04b",
-  OUTSIDE_TIME_WINDOW: "#c98ae0", AMOUNT_CAP_EXCEEDED: "#7c9cf5",
-  PERIOD_CAP_EXCEEDED: "#5b8ae0", FREQUENCY_CAP_EXCEEDED: "#8ad0e0",
-  MANDATE_EXPIRED: "#9aa3b2", MANDATE_NOT_YET_VALID: "#7a8194",
+  ALLOWED: "#4fa87c", MANDATE_REVOKED: "#d4544f", MANDATE_NOT_CONFIRMED: "#e0a33d",
+  MERCHANT_NOT_ALLOWED: "#cf7a4a", CATEGORY_EXCLUDED: "#e0a33d",
+  OUTSIDE_TIME_WINDOW: "#a88fc4", AMOUNT_CAP_EXCEEDED: "#8195bd",
+  PERIOD_CAP_EXCEEDED: "#6f86ad", FREQUENCY_CAP_EXCEEDED: "#7fa9b5",
+  MANDATE_EXPIRED: "#9a8d76", MANDATE_NOT_YET_VALID: "#6e6353",
 };
-const rcolor = r => REASON_COLOR[r] || "#59606e";
+const rcolor = r => REASON_COLOR[r] || "#6e6353";
 
 let mandateId = null, stream = null, pendingField = null;
 let tally = {}, spark = [], lastPeriod = null, tamperOn = false;
@@ -521,8 +530,8 @@ function paintMandate(m) {
 
   const ok = m.signature_valid;
   $("sealText").textContent = ok ? "Signed · Ed25519" : "SIGNATURE INVALID";
-  $("sealText").style.color = ok ? "#b6becb" : "var(--coral)";
-  $("sealIcon").setAttribute("stroke", ok ? "#3ddc97" : "#ff6b6b");
+  $("sealText").style.color = ok ? "#c3b69d" : "var(--coral)";
+  $("sealIcon").setAttribute("stroke", ok ? "#4fa87c" : "#d4544f");
   $("sealHash").textContent = m.signature ? m.signature.slice(0, 14) + "…" + m.signature.slice(-4) : "unsigned";
   $("mandateWrap").hidden = false;
 
@@ -549,7 +558,7 @@ function paintStatus(status) {
   kill.classList.toggle("spent", revoked || none);
   $("killLabel").textContent = revoked ? "Revoked" : "Revoke mandate";
   $("killSub").textContent = revoked ? "Cannot be reinstated" : none ? "No mandate loaded" : "Stops the agent immediately";
-  $("killIcon").setAttribute("stroke", revoked || none ? "#6d4a4a" : "#ff8080");
+  $("killIcon").setAttribute("stroke", revoked || none ? "#6b4f47" : "#e0736c");
 }
 
 /* ─────────────── ledger ─────────────── */
@@ -596,9 +605,9 @@ function addRow(s) {
     `<div class="m">${esc(s.merchant)}</div>` +
     `<div class="c">${esc(s.category)}</div>` +
     `<div class="amt num r">${inr(s.amount)}</div>` +
-    `<div class="verdict"><i style="background:${allowed ? "#3ddc97" : "#ff6b6b"}"></i>` +
+    `<div class="verdict"><i style="background:${allowed ? "#4fa87c" : "#d4544f"}"></i>` +
       `<span class="${allowed ? "allow" : "block"}">${s.result}</span></div>` +
-    `<div class="why" style="color:${allowed ? "#4d6a5e" : rcolor(s.reason_code)}">${esc(s.reason_code)}</div>` +
+    `<div class="why" style="color:${allowed ? "#5c6f5a" : rcolor(s.reason_code)}">${esc(s.reason_code)}</div>` +
     `<div class="hash num">${esc(s.audit_hash.slice(0, 7))}</div>`;
   $("rows").prepend(div);
   while ($("rows").childElementCount > 160) $("rows").lastElementChild.remove();
@@ -617,7 +626,7 @@ function addRow(s) {
   spark.push(frac);
   paintSpark();
 
-  const col = frac > .85 ? "#ff6b6b" : frac > .6 ? "#e8b04b" : "#3ddc97";
+  const col = frac > .85 ? "#d4544f" : frac > .6 ? "#e0a33d" : "#4fa87c";
   $("spent").textContent = inr(s.period_spent);
   $("spent").style.color = col;
   $("sparkLine").setAttribute("stroke", col);
@@ -636,7 +645,7 @@ async function refreshChain() {
   const r = await fetch("/audit/verify").then(r => r.json());
   const bad = !r.valid;
   $("chainState").classList.toggle("bad", bad);
-  $("chainIcon").setAttribute("stroke", bad ? "#ff6b6b" : "#3ddc97");
+  $("chainIcon").setAttribute("stroke", bad ? "#d4544f" : "#4fa87c");
   $("chainIcon").innerHTML = bad
     ? '<path d="M12 8.5v4.5M12 16.6v.01"></path><circle cx="12" cy="12" r="9"></circle>'
     : '<path d="M20 6L9 17l-5-5"></path>';
@@ -677,7 +686,7 @@ async function refreshPending() {
 
 function notice(kind, title, body, problems) {
   const icon = { ok: "M20 6L9 17l-5-5", warn: "M12 9v4M12 16.5v.01", bad: "M18 6L6 18M6 6l12 12" }[kind];
-  const stroke = { ok: "#3ddc97", warn: "#e8b04b", bad: "#ff6b6b" }[kind];
+  const stroke = { ok: "#4fa87c", warn: "#e0a33d", bad: "#d4544f" }[kind];
   $("outcome").className = "notice " + kind;
   $("outcome").innerHTML =
     `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="${stroke}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${icon}"></path>${kind === "warn" ? '<circle cx="12" cy="12" r="9"></circle>' : ""}</svg>` +
