@@ -1,0 +1,38 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 1600, "h": 1040, "title": "Console — the operator's surface", "is_interactive": true },
+    { "file": "Compile.dc.html", "x": 1720, "y": 0, "w": 1000, "h": 1040, "title": "Provenance — which words became which rule", "is_interactive": true },
+    { "file": "Principal.dc.html", "x": 2840, "y": 0, "w": 390, "h": 844, "title": "Principal — the human's kill switch", "is_interactive": true }
+  ],
+  "annotations": [
+    {
+      "id": "thesis",
+      "x": 0,
+      "y": -300,
+      "w": 700,
+      "text": "The thesis\n\nThis isn't a dashboard, it's a trust instrument. Someone has handed an autonomous agent their wallet, and they have three questions in this order: am I safe right now, can I stop it, can I prove what happened.\n\nSo the console answers them in that order. A full-width band states the answer — status, money committed, kill switch — before any table appears. Detail lives below it, not above."
+    },
+    {
+      "id": "system",
+      "x": 740,
+      "y": -300,
+      "w": 460,
+      "text": "The system\n\nInstrument Serif for anything that speaks (status, the sentence, headings); IBM Plex Mono for everything measured. Numbers are tabular throughout.\n\nColour is signal, never decoration: amber = the model's work, mint = verified by code, coral = refused, indigo = proven by hash. Each zone is introduced by a hairline in its own colour."
+    },
+    {
+      "id": "provenance",
+      "x": 1720,
+      "y": -300,
+      "w": 620,
+      "text": "The idea worth stealing\n\nEvery enforced rule is traced back to the words that produced it. Click a clause, watch its rule light up.\n\nThe payoff is the rule that traces back to NOTHING — frequency_cap had no source clause, which is precisely why the compiler flagged it. The provenance view makes an abstract safety property into something you can point at."
+    },
+    {
+      "id": "phone",
+      "x": 2840,
+      "y": -300,
+      "w": 390,
+      "text": "The surface everyone forgets\n\nThe person who granted the mandate is not sitting at a console. They get plain language — \"Wine — you excluded alcohol\" — and one unmistakable control.\n\nNo fake status bar: that space is left for the real one."
+    }
+  ],
+  "launch": { "view": "canvas" }
+}

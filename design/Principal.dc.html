@@ -1,0 +1,167 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <style>
+    body { margin: 0; font-family: "IBM Plex Sans", system-ui, -apple-system, sans-serif; }
+    a { color: #8ea9f2; text-decoration: none; }
+    a:hover { color: #b3c5f7; }
+    ::-webkit-scrollbar { width: 0; }
+    .num { font-variant-numeric: tabular-nums; }
+    .settle { animation: settle .4s cubic-bezier(.16,.84,.3,1); }
+    @keyframes settle { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: none } }
+  </style>
+</helmet>
+
+<div style="width: 390px; height: 844px; display: flex; flex-direction: column; background: #07080b; color: #e8ebf0; font-size: 15px; line-height: 1.5; overflow: hidden;">
+
+  <!-- top space left deliberately clear for the real status bar -->
+  <div style="height: 54px; flex-shrink: 0;"></div>
+
+  <div style="padding: 0 22px 18px; flex-shrink: 0;">
+    <div style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: #59606e;">Your shopping agent</div>
+    <div style="display: flex; align-items: center; gap: 10px; margin-top: 8px;">
+      <div style="width: 8px; height: 8px; border-radius: 50%; background: {{state.dot}}; box-shadow: 0 0 12px {{state.glow}};"></div>
+      <div style="font-family: 'Instrument Serif', Georgia, serif; font-size: 30px; line-height: 1.1; color: {{state.fg}};">{{state.label}}</div>
+    </div>
+    <div style="font-size: 13.5px; color: #8b93a3; margin-top: 7px; line-height: 1.5;">{{state.sub}}</div>
+  </div>
+
+  <!-- the money, in one glance -->
+  <div style="margin: 0 22px 16px; padding: 20px; border-radius: 16px; background: #0c0e13; border: 1px solid #161b23; flex-shrink: 0;">
+    <div style="display: flex; align-items: baseline; justify-content: space-between;">
+      <span style="font-size: 12.5px; color: #8b93a3;">Spent this week</span>
+      <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; color: #59606e;">resets Monday</span>
+    </div>
+    <div style="display: flex; align-items: baseline; gap: 8px; margin-top: 10px;">
+      <span class="num" style="font-family: 'IBM Plex Mono', monospace; font-size: 38px; font-weight: 500; line-height: 1; letter-spacing: -0.03em; color: {{money.fg}};">{{money.spent}}</span>
+      <span style="font-family: 'IBM Plex Mono', monospace; font-size: 15px; color: #59606e;">of {{money.cap}}</span>
+    </div>
+    <div style="height: 6px; border-radius: 3px; background: #161b23; margin-top: 16px; overflow: hidden;">
+      <div style="height: 100%; width: {{money.pct}}; background: {{money.fg}}; border-radius: 3px; transition: width .35s ease;"></div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 7px; margin-top: 13px;">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ff6b6b" stroke-width="2.2" stroke-linecap="round">
+        <circle cx="12" cy="12" r="9"></circle><path d="M8.4 8.4l7.2 7.2"></path>
+      </svg>
+      <span style="font-size: 12.5px; color: #8b93a3;">{{money.blocked}}</span>
+    </div>
+  </div>
+
+  <!-- what it did, in plain words -->
+  <div style="flex-grow: 1; min-height: 0; display: flex; flex-direction: column; padding: 0 22px;">
+    <div style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: #59606e; padding-bottom: 12px; flex-shrink: 0;">Today</div>
+
+    <div style="flex-grow: 1; overflow-y: auto; min-height: 0; display: flex; flex-direction: column; gap: 2px;">
+      <sc-for list="{{activity}}" as="a" hint-placeholder-count="6">
+        <div class="settle" style="display: flex; align-items: center; gap: 13px; padding: 12px 4px; border-bottom: 1px solid #0e1116; min-height: 44px;">
+          <div style="width: 32px; height: 32px; border-radius: 10px; background: {{a.chipBg}}; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="{{a.chipFg}}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="{{a.icon}}"></path>
+            </svg>
+          </div>
+          <div style="flex-grow: 1; min-width: 0;">
+            <div style="font-size: 14px; color: #e8ebf0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{a.title}}</div>
+            <div style="font-size: 12px; color: {{a.subFg}}; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{a.sub}}</div>
+          </div>
+          <div class="num" style="font-family: 'IBM Plex Mono', monospace; font-size: 14px; color: {{a.amtFg}}; flex-shrink: 0;">{{a.amount}}</div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <!-- the control -->
+  <div style="padding: 16px 22px 28px; flex-shrink: 0; border-top: 1px solid #12161d; background: #090a0e;">
+    <div onClick="{{toggle}}" style="display: flex; align-items: center; justify-content: center; gap: 11px; height: 56px; border-radius: 15px; background: {{button.bg}}; border: 1px solid {{button.border}}; cursor: pointer; user-select: none;">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="{{button.fg}}" stroke-width="2.1" stroke-linecap="round">
+        <path d="{{button.icon}}"></path>
+        <path d="{{button.icon2}}"></path>
+      </svg>
+      <span style="font-size: 15.5px; font-weight: 600; color: {{button.fg}};">{{button.label}}</span>
+    </div>
+    <div style="font-size: 11.5px; color: #4d545f; text-align: center; margin-top: 11px; line-height: 1.5;">{{button.note}}</div>
+  </div>
+</div>
+</x-dc>
+
+<script data-dc-script>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { revoked: false };
+  }
+
+  toggle = () => this.setState({ revoked: !this.state.revoked });
+
+  renderVals() {
+    const revoked = this.state.revoked;
+    const CAP = 2000;
+    const spent = revoked ? 1240 : 1240;
+
+    const base = [
+      { m: 'Zepto', c: 'Milk, bread, eggs', amt: 340, ok: true, t: '4:12 pm' },
+      { m: 'Amazon', c: 'Not on your list', amt: 1890, ok: false, t: '2:40 pm' },
+      { m: 'BigBasket', c: 'Fruit and vegetables', amt: 520, ok: true, t: '11:05 am' },
+      { m: 'BigBasket', c: 'Wine — you excluded alcohol', amt: 780, ok: false, t: '11:04 am' },
+      { m: 'Swiggy Instamart', c: 'Household', amt: 380, ok: true, t: '9:22 am' },
+      { m: 'Zepto', c: 'Outside your 6am–11pm window', amt: 210, ok: false, t: '2:15 am' },
+    ];
+
+    const rows = revoked
+      ? [{ m: 'Zepto', c: 'You stopped the agent', amt: 260, ok: false, t: 'just now', revoked: true }, ...base]
+      : base;
+
+    const inr = (n) => '₹' + n.toLocaleString('en-IN');
+    const pct = Math.min(100, (spent / CAP) * 100);
+
+    const activity = rows.map((r) => ({
+      title: r.m,
+      sub: r.ok ? r.c + ' · ' + r.t : r.c,
+      amount: inr(r.amt),
+      amtFg: r.ok ? '#e8ebf0' : '#4d545f',
+      subFg: r.ok ? '#8b93a3' : '#b57676',
+      chipBg: r.ok ? 'rgba(61,220,151,.10)' : 'rgba(255,107,107,.10)',
+      chipFg: r.ok ? '#3ddc97' : '#ff6b6b',
+      icon: r.ok ? 'M20 6L9 17l-5-5' : 'M18 6L6 18M6 6l12 12',
+    }));
+
+    return {
+      state: revoked
+        ? {
+            label: 'Stopped', fg: '#ff6b6b', dot: '#ff6b6b', glow: 'rgba(255,107,107,.55)',
+            sub: 'Your agent can’t spend anything until you turn it back on.',
+          }
+        : {
+            label: 'Watching', fg: '#e8ebf0', dot: '#3ddc97', glow: 'rgba(61,220,151,.5)',
+            sub: 'Buying groceries under the limits you set.',
+          },
+      money: {
+        spent: inr(spent), cap: inr(CAP), pct: pct.toFixed(1) + '%',
+        fg: pct > 85 ? '#ff6b6b' : pct > 60 ? '#e8b04b' : '#3ddc97',
+        blocked: revoked ? '4 blocked before you stopped it' : '3 attempts blocked today',
+      },
+      activity,
+      toggle: this.toggle,
+      button: revoked
+        ? {
+            label: 'Let it spend again', bg: '#0e1218', border: '#212936', fg: '#b6becb',
+            icon: 'M12 3.5v8.5', icon2: 'M6.8 6.6a8 8 0 1010.4 0',
+            note: 'Turning it back on restores the same limits.',
+          }
+        : {
+            label: 'Stop my agent', bg: '#1c0e11', border: '#4a1c22', fg: '#ff8080',
+            icon: 'M12 3.5v8.5', icon2: 'M6.8 6.6a8 8 0 1010.4 0',
+            note: 'Takes effect on its very next purchase.',
+          },
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,212 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+  <style>
+    body { margin: 0; font-family: "IBM Plex Sans", system-ui, -apple-system, sans-serif; }
+    a { color: #8ea9f2; text-decoration: none; }
+    a:hover { color: #b3c5f7; }
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #1e242e; border-radius: 4px; }
+    .num { font-variant-numeric: tabular-nums; }
+    .tok { transition: background .16s ease, color .16s ease; }
+  </style>
+</helmet>
+
+<div style="width: 1000px; height: 1040px; display: flex; flex-direction: column; background: #07080b; color: #e8ebf0; font-size: 14px; line-height: 1.5; overflow: hidden;">
+
+  <!-- header -->
+  <div style="padding: 26px 34px 20px; border-bottom: 1px solid #161b23; flex-shrink: 0;">
+    <div style="font-family: 'Instrument Serif', Georgia, serif; font-size: 27px; line-height: 1.15; letter-spacing: -0.005em;">What the model actually did</div>
+    <div style="font-size: 13px; color: #8b93a3; margin-top: 7px; max-width: 620px; line-height: 1.55;">Every enforced rule traces back to words the human wrote. Click a clause to follow it — or find the rule that traces back to nothing.</div>
+  </div>
+
+  <!-- the sentence -->
+  <div style="padding: 26px 34px 22px; flex-shrink: 0;">
+    <div style="font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.16em; text-transform: uppercase; color: #59606e; margin-bottom: 14px;">The sentence</div>
+    <div style="font-family: 'Instrument Serif', Georgia, serif; font-size: 26px; line-height: 1.62; letter-spacing: 0.003em; white-space: pre-wrap;">
+      <sc-for list="{{tokens}}" as="t" hint-placeholder-count="9">
+        <span class="tok" onClick="{{t.pick}}" style="background: {{t.bg}}; color: {{t.fg}}; border-bottom: {{t.rule}}; padding: 1px 2px; border-radius: 3px; cursor: {{t.cursor}};">{{t.text}}</span>
+      </sc-for>
+    </div>
+  </div>
+
+  <!-- mapping -->
+  <div style="flex-grow: 1; min-height: 0; padding: 0 34px 20px; display: flex; flex-direction: column; gap: 13px; overflow-y: auto;">
+
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <span style="font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.16em; text-transform: uppercase; color: #59606e;">Compiled to</span>
+      <div style="height: 1px; flex-grow: 1; background: #12161d;"></div>
+      <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #3f4653;">{{mappedCount}} of 7 rules traced</span>
+    </div>
+
+    <sc-for list="{{fields}}" as="f" hint-placeholder-count="7">
+      <div onClick="{{f.pick}}" style="display: flex; align-items: stretch; gap: 14px; padding: 13px 16px; border-radius: 10px; background: {{f.bg}}; border: 1px solid {{f.border}}; cursor: pointer;">
+        <div style="width: 3px; border-radius: 2px; background: {{f.accent}}; flex-shrink: 0;"></div>
+        <div style="flex-grow: 1; min-width: 0;">
+          <div style="display: flex; align-items: baseline; gap: 10px;">
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: {{f.nameFg}};">{{f.name}}</span>
+            <div style="flex-grow: 1;"></div>
+            <span class="num" style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 500; color: {{f.valueFg}};">{{f.value}}</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 7px; margin-top: 6px;">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="{{f.originIcon}}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;">
+              <path d="{{f.icon}}"></path>
+            </svg>
+            <span style="font-size: 11.5px; color: {{f.originFg}}; font-style: {{f.originStyle}};">{{f.origin}}</span>
+          </div>
+        </div>
+      </div>
+    </sc-for>
+
+    <!-- the orphan -->
+    <div style="margin-top: 4px; padding: 16px 18px; border-radius: 11px; background: #14100a; border: 1px solid #33280f;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#e8b04b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 9.2v4.2M12 16.9v.01"></path><circle cx="12" cy="12" r="9"></circle>
+        </svg>
+        <span style="font-size: 13px; font-weight: 600; color: #e8b04b;">One rule traces back to nothing</span>
+      </div>
+      <div style="font-size: 12.5px; color: #b8ac93; margin-top: 9px; line-height: 1.6;">Nothing in the sentence says how <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #e8b04b;">frequency_cap</span> should be set. The model picked <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #e8ebf0;">14 / week</span> — and had to say so.</div>
+      <div style="font-family: 'Instrument Serif', Georgia, serif; font-style: italic; font-size: 16px; color: #d5dae3; margin-top: 12px; padding-left: 14px; border-left: 2px solid #33280f; line-height: 1.5;">“How many orders a week should the agent be allowed to place?”</div>
+      <div style="font-size: 11.5px; color: #6d7481; margin-top: 12px; line-height: 1.55;">A guess on a spending bound holds the mandate unenforceable until a human answers. A guess on a time window is only recorded.</div>
+    </div>
+  </div>
+
+  <!-- gate -->
+  <div style="flex-shrink: 0; padding: 18px 34px 24px; border-top: 1px solid #161b23; background: #090a0e;">
+    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 13px;">
+      <div style="width: 14px; height: 1px; background: #3ddc97;"></div>
+      <span style="font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.16em; text-transform: uppercase; color: #3ddc97;">Then ordinary code checks the model's work</span>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px 22px;">
+      <sc-for list="{{checks}}" as="c" hint-placeholder-count="6">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#3ddc97" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;">
+            <path d="M20 6L9 17l-5-5"></path>
+          </svg>
+          <span style="font-size: 12px; color: #8b93a3;">{{c}}</span>
+        </div>
+      </sc-for>
+    </div>
+    <div style="font-size: 11.5px; color: #59606e; margin-top: 14px; line-height: 1.55; max-width: 700px;">A cap the model hallucinated fails here and is never signed — which keeps it a translation bug instead of a spending bug.</div>
+  </div>
+</div>
+</x-dc>
+
+<script data-dc-script>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { active: null };
+  }
+
+  pick = (id) => () => this.setState({ active: this.state.active === id ? null : id });
+
+  renderVals() {
+    const active = this.state.active;
+
+    // Each clause of the sentence, and the rule it produced.
+    const MAP = {
+      cap:   { hue: '#7c9cf5', name: 'amount_cap_period', value: '₹2,000 / week', origin: '“up to ₹2,000 per week”' },
+      who:   { hue: '#3ddc97', name: 'merchant_allowlist', value: 'zepto · swiggy · bigbasket', origin: '“only from Zepto, Swiggy or BigBasket”' },
+      never: { hue: '#ff8f6b', name: 'category_exclusions', value: 'alcohol', origin: '“no alcohol”' },
+      when:  { hue: '#c98ae0', name: 'time_window', value: '06:00 — 23:00', origin: '“only between 6am and 11pm”' },
+    };
+
+    // The sentence, split so every clause is addressable.
+    const parts = [
+      { text: 'Let my agent buy groceries, ', id: null },
+      { text: 'up to ₹2,000 per week', id: 'cap' },
+      { text: ', ', id: null },
+      { text: 'only from Zepto, Swiggy or BigBasket', id: 'who' },
+      { text: ', ', id: null },
+      { text: 'no alcohol', id: 'never' },
+      { text: ', and ', id: null },
+      { text: 'only between 6am and 11pm', id: 'when' },
+      { text: '.', id: null },
+    ];
+
+    const tokens = parts.map((p) => {
+      if (!p.id) {
+        return {
+          text: p.text, bg: 'transparent', fg: '#4d545f',
+          rule: 'none', cursor: 'default', pick: () => {},
+        };
+      }
+      const m = MAP[p.id];
+      const isActive = active === p.id;
+      const dimmed = active && !isActive;
+      return {
+        text: p.text,
+        bg: isActive ? m.hue + '26' : 'transparent',
+        fg: dimmed ? '#4d545f' : '#e8ebf0',
+        rule: '2px solid ' + (dimmed ? '#232a35' : m.hue),
+        cursor: 'pointer',
+        pick: this.pick(p.id),
+      };
+    });
+
+    const tick = 'M20 6L9 17l-5-5';
+    const fields = Object.keys(MAP).map((id) => {
+      const m = MAP[id];
+      const isActive = active === id;
+      const dimmed = active && !isActive;
+      return {
+        name: m.name,
+        value: m.value,
+        origin: 'from ' + m.origin,
+        accent: dimmed ? '#232a35' : m.hue,
+        bg: isActive ? '#0e1218' : 'transparent',
+        border: isActive ? '#212936' : '#12161d',
+        nameFg: dimmed ? '#4d545f' : '#b6becb',
+        valueFg: dimmed ? '#4d545f' : '#e8ebf0',
+        originFg: dimmed ? '#3f4653' : '#8b93a3',
+        originStyle: 'normal',
+        originIcon: dimmed ? '#2c3441' : m.hue,
+        icon: tick,
+        pick: this.pick(id),
+      };
+    });
+
+    // per_txn is derived, not quoted — worth showing as its own kind of origin.
+    fields.push({
+      name: 'amount_cap_per_txn',
+      value: '₹2,000',
+      origin: 'derived — no separate per-transaction limit was stated',
+      accent: active ? '#232a35' : '#3f4653',
+      bg: 'transparent', border: '#12161d',
+      nameFg: active ? '#4d545f' : '#b6becb',
+      valueFg: active ? '#4d545f' : '#8b93a3',
+      originFg: active ? '#3f4653' : '#6d7481',
+      originStyle: 'italic',
+      originIcon: active ? '#2c3441' : '#59606e',
+      icon: 'M5 12h14M12 5l7 7-7 7',
+      pick: () => this.setState({ active: null }),
+    });
+
+    return {
+      tokens,
+      fields,
+      mappedCount: '5',
+      checks: [
+        'caps are positive',
+        'caps under ceiling',
+        'per-txn ≤ period cap',
+        'times are valid HH:MM',
+        'allowlist is non-empty',
+        'no merchant/category clash',
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

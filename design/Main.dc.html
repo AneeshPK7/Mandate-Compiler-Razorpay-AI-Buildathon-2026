@@ -1,0 +1,626 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+  <style>
+    body { margin: 0; font-family: "IBM Plex Sans", system-ui, -apple-system, sans-serif; }
+    a { color: #8ea9f2; text-decoration: none; }
+    a:hover { color: #b3c5f7; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #1e242e; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #2c3441; }
+    .num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+    .in { animation: in .38s cubic-bezier(.16,.84,.3,1); }
+    @keyframes in {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: none; }
+    }
+    .live { animation: live 1.8s ease-in-out infinite; }
+    @keyframes live { 0%,100% { opacity: 1 } 50% { opacity: .3 } }
+    .trip { animation: trip .5s cubic-bezier(.36,.07,.19,.97); }
+    @keyframes trip {
+      0% { transform: none } 15% { transform: translateX(-5px) }
+      35% { transform: translateX(4px) } 55% { transform: translateX(-3px) }
+      75% { transform: translateX(2px) } 100% { transform: none }
+    }
+  </style>
+</helmet>
+
+<div style="width: 1600px; height: 1040px; display: flex; flex-direction: column; background: #07080b; color: #e8ebf0; font-size: 14px; line-height: 1.5; overflow: hidden;">
+
+  <!-- ══════════════════════ masthead ══════════════════════ -->
+  <div style="display: flex; align-items: center; gap: 18px; padding: 0 28px; height: 54px; border-bottom: 1px solid #161b23; flex-shrink: 0;">
+    <div style="display: flex; align-items: baseline; gap: 9px;">
+      <span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 21px; letter-spacing: 0.01em;">Mandate</span>
+      <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; letter-spacing: 0.13em; text-transform: uppercase; color: #59606e;">compiler</span>
+    </div>
+
+    <div style="width: 1px; height: 20px; background: #1e242e;"></div>
+
+    <div style="display: flex; align-items: center; gap: 9px;">
+      <span style="font-size: 12px; color: #59606e;">agent</span>
+      <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #b6becb;">shopping-agent-1</span>
+    </div>
+
+    <div style="flex-grow: 1;"></div>
+
+    <div style="display: flex; align-items: center; gap: 22px;">
+      <sc-for list="{{pipeline}}" as="p" hint-placeholder-count="5">
+        <div style="display: flex; align-items: center; gap: 7px;">
+          <div style="width: 4px; height: 4px; border-radius: 50%; background: {{p.dot}};"></div>
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: {{p.fg}};">{{p.label}}</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <!-- ══════════════════════ the answer band ══════════════════════ -->
+  <div class="{{trip}}" style="display: grid; grid-template-columns: 340px 1fr 300px; align-items: stretch; border-bottom: 1px solid #161b23; background: {{band.bg}}; flex-shrink: 0;">
+
+    <!-- state -->
+    <div style="padding: 24px 28px; border-right: 1px solid #161b23; display: flex; flex-direction: column; justify-content: center;">
+      <div style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: #59606e; margin-bottom: 10px;">Mandate status</div>
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <div style="width: 9px; height: 9px; border-radius: 50%; background: {{band.dot}}; box-shadow: 0 0 14px {{band.glow}};"></div>
+        <div style="font-family: 'Instrument Serif', Georgia, serif; font-size: 40px; line-height: 1; letter-spacing: -0.01em; color: {{band.fg}};">{{band.label}}</div>
+      </div>
+      <div style="font-size: 12.5px; color: #8b93a3; margin-top: 10px; line-height: 1.5;">{{band.sub}}</div>
+    </div>
+
+    <!-- burndown -->
+    <div style="padding: 22px 30px; border-right: 1px solid #161b23; display: flex; flex-direction: column; justify-content: center;">
+      <div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px;">
+        <div style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: #59606e;">Committed this week</div>
+        <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #59606e;">cap {{budget.cap}}</div>
+      </div>
+
+      <div style="display: flex; align-items: flex-end; gap: 26px;">
+        <div style="display: flex; align-items: baseline; gap: 3px;">
+          <span class="num" style="font-family: 'IBM Plex Mono', monospace; font-size: 44px; font-weight: 500; line-height: 1; letter-spacing: -0.03em; color: {{budget.fg}};">{{budget.spent}}</span>
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 15px; color: #59606e; margin-left: 5px;">/ {{budget.cap}}</span>
+        </div>
+
+        <!-- the week, as a curve -->
+        <div style="flex-grow: 1; min-width: 0;">
+          <svg viewBox="0 0 320 46" preserveAspectRatio="none" style="width: 100%; height: 46px; display: block;">
+            <defs>
+              <linearGradient id="bd" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="{{budget.fg}}" stop-opacity="0.26"></stop>
+                <stop offset="100%" stop-color="{{budget.fg}}" stop-opacity="0"></stop>
+              </linearGradient>
+            </defs>
+            <line x1="0" y1="45" x2="320" y2="45" stroke="#1e242e" stroke-width="1"></line>
+            <path d="{{budget.area}}" fill="url(#bd)"></path>
+            <path d="{{budget.path}}" fill="none" stroke="{{budget.fg}}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"></path>
+          </svg>
+          <div style="display: flex; justify-content: space-between; margin-top: 5px;">
+            <sc-for list="{{days}}" as="d" hint-placeholder-count="7">
+              <span style="font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; color: #3f4653;">{{d}}</span>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- the kill switch -->
+    <div style="padding: 20px 24px; display: flex; flex-direction: column; justify-content: center; gap: 9px;">
+      <div onClick="{{revoke}}" style="position: relative; padding: 16px 18px; border-radius: 10px; background: {{kill.bg}}; border: 1px solid {{kill.border}}; cursor: {{kill.cursor}}; user-select: none; overflow: hidden;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="{{kill.fg}}" stroke-width="2" stroke-linecap="round">
+            <path d="M12 3.5v8.5"></path>
+            <path d="M6.8 6.6a8 8 0 1010.4 0"></path>
+          </svg>
+          <div>
+            <div style="font-size: 14px; font-weight: 600; letter-spacing: 0.01em; color: {{kill.fg}};">{{kill.label}}</div>
+            <div style="font-size: 11px; color: {{kill.subFg}}; margin-top: 2px;">{{kill.sub}}</div>
+          </div>
+        </div>
+      </div>
+      <div style="font-size: 10.5px; color: #3f4653; text-align: center; line-height: 1.45;">Effective on the next transaction, not the next batch.</div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════ working surface ══════════════════════ -->
+  <div style="display: grid; grid-template-columns: 340px 1fr 300px; flex-grow: 1; min-height: 0;">
+
+    <!-- ─────────── the mandate, as an instrument ─────────── -->
+    <div style="border-right: 1px solid #161b23; display: flex; flex-direction: column; min-height: 0; background: #090a0e;">
+
+      <div style="padding: 16px 28px 0; display: flex; align-items: center; gap: 8px;">
+        <div style="width: 14px; height: 1px; background: #e8b04b;"></div>
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.16em; text-transform: uppercase; color: #e8b04b;">Compiled by model</span>
+      </div>
+
+      <div style="padding: 12px 28px 20px; overflow-y: auto; min-height: 0; display: flex; flex-direction: column; gap: 18px;">
+
+        <!-- the sentence -->
+        <div>
+          <div style="font-family: 'Instrument Serif', Georgia, serif; font-style: italic; font-size: 17px; line-height: 1.55; color: #d5dae3; letter-spacing: 0.004em;">“{{policy}}”</div>
+          <div style="display: flex; align-items: center; gap: 7px; margin-top: 11px;">
+            <div style="height: 1px; flex-grow: 1; background: #161b23;"></div>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#3f4653" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12l7 7 7-7"></path></svg>
+            <div style="height: 1px; flex-grow: 1; background: #161b23;"></div>
+          </div>
+        </div>
+
+        <!-- terms, as a rendered instrument -->
+        <div>
+          <div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px;">
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.16em; text-transform: uppercase; color: #59606e;">Enforced terms</span>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: #59606e;">v{{version}}</span>
+          </div>
+
+          <sc-for list="{{terms}}" as="t" hint-placeholder-count="6">
+            <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 14px; padding: 8px 0; border-bottom: 1px solid #12161d;">
+              <span style="font-size: 12.5px; color: #8b93a3;">{{t.k}}</span>
+              <span class="num" style="font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; color: {{t.fg}}; text-align: right;">{{t.v}}</span>
+            </div>
+          </sc-for>
+        </div>
+
+        <!-- the seal -->
+        <div style="padding: 13px 15px; border: 1px solid #17202c; border-radius: 10px; background: #0b0f15;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#3ddc97" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2.8l7 3v5.1c0 4.2-2.9 7.8-7 9-4.1-1.2-7-4.8-7-9V5.8z"></path>
+              <path d="M9.3 12l1.9 1.9L15 10"></path>
+            </svg>
+            <div style="flex-grow: 1;">
+              <div style="font-size: 12px; color: #b6becb;">Signed · Ed25519</div>
+              <div style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #3f4653; margin-top: 2px;">{{sig}}</div>
+            </div>
+          </div>
+          <div style="font-size: 10.5px; color: #59606e; margin-top: 9px; line-height: 1.5; padding-top: 9px; border-top: 1px solid #12161d;">Signature covers the terms above, not the status — revocation is proven by the chain instead.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─────────── the ledger ─────────── -->
+    <div style="display: flex; flex-direction: column; min-height: 0; border-right: 1px solid #161b23;">
+
+      <div style="display: flex; align-items: center; gap: 12px; padding: 15px 24px 13px;">
+        <div style="width: 14px; height: 1px; background: #3ddc97;"></div>
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.16em; text-transform: uppercase; color: #3ddc97;">Enforced by code</span>
+
+        <sc-if value="{{streaming}}" hint-placeholder-val="{{true}}">
+          <div class="live" style="display: flex; align-items: center; gap: 6px; margin-left: 4px;">
+            <div style="width: 5px; height: 5px; border-radius: 50%; background: #3ddc97;"></div>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #8b93a3;">live</span>
+          </div>
+        </sc-if>
+
+        <div style="flex-grow: 1;"></div>
+
+        <!-- counts as a single legible unit, not four tiles -->
+        <div style="display: flex; align-items: baseline; gap: 18px;">
+          <sc-for list="{{counts}}" as="c" hint-placeholder-count="3">
+            <div style="display: flex; align-items: baseline; gap: 6px;">
+              <span class="num" style="font-family: 'IBM Plex Mono', monospace; font-size: 19px; font-weight: 500; color: {{c.fg}}; letter-spacing: -0.02em;">{{c.n}}</span>
+              <span style="font-size: 10.5px; letter-spacing: 0.07em; text-transform: uppercase; color: #59606e;">{{c.label}}</span>
+            </div>
+          </sc-for>
+        </div>
+
+        <div onClick="{{simulate}}" style="margin-left: 8px; padding: 7px 17px; border-radius: 7px; background: {{run.bg}}; border: 1px solid {{run.border}}; color: {{run.fg}}; font-size: 12.5px; font-weight: 600; cursor: pointer; user-select: none;">{{run.label}}</div>
+        <div onClick="{{reset}}" style="padding: 7px 12px; border-radius: 7px; background: transparent; border: 1px solid #1e242e; color: #8b93a3; font-size: 12.5px; cursor: pointer; user-select: none;">Reset</div>
+      </div>
+
+      <!-- reason spectrum: a single stacked bar, not a chart junk pile -->
+      <div style="padding: 0 24px 13px;">
+        <div style="display: flex; height: 5px; border-radius: 3px; overflow: hidden; background: #12161d;">
+          <sc-for list="{{spectrum}}" as="s" hint-placeholder-count="4">
+            <div style="width: {{s.w}}; background: {{s.color}};"></div>
+          </sc-for>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 5px 16px; margin-top: 9px;">
+          <sc-for list="{{legend}}" as="l" hint-placeholder-count="4">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <div style="width: 6px; height: 6px; border-radius: 2px; background: {{l.color}};"></div>
+              <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: #8b93a3;">{{l.label}}</span>
+              <span class="num" style="font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: #59606e;">{{l.n}}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <!-- column rule -->
+      <div style="display: grid; grid-template-columns: 46px 74px 1fr 1fr 104px 92px 1.35fr; padding: 0 24px 7px; border-bottom: 1px solid #161b23;">
+        <sc-for list="{{cols}}" as="c" hint-placeholder-count="7">
+          <div style="font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.13em; text-transform: uppercase; color: #3f4653; text-align: {{c.a}};">{{c.l}}</div>
+        </sc-for>
+      </div>
+
+      <div style="flex-grow: 1; overflow-y: auto; min-height: 0;">
+        <sc-if value="{{empty}}" hint-placeholder-val="{{true}}">
+          <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 90px 20px;">
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#232a35" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 12h4l2.5-6 4 12L16 12h5"></path>
+            </svg>
+            <div style="text-align: center;">
+              <div style="font-family: 'Instrument Serif', Georgia, serif; font-size: 19px; color: #59606e;">No transactions evaluated</div>
+              <div style="font-size: 12px; color: #3f4653; margin-top: 5px;">Run the batch to watch the engine decide.</div>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-for list="{{rows}}" as="r" hint-placeholder-count="8">
+          <div class="{{r.anim}}" style="display: grid; grid-template-columns: 46px 74px 1fr 1fr 104px 92px 1.35fr; align-items: center; padding: 0 24px; height: 34px; border-bottom: 1px solid #0e1116; background: {{r.bg}};">
+            <div class="num" style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #3f4653;">{{r.seq}}</div>
+            <div class="num" style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #59606e;">{{r.time}}</div>
+            <div style="font-size: 12.5px; color: #d5dae3;">{{r.merchant}}</div>
+            <div style="font-size: 12.5px; color: #8b93a3;">{{r.category}}</div>
+            <div class="num" style="font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; color: {{r.amtFg}}; text-align: right; padding-right: 20px;">{{r.amount}}</div>
+            <div style="display: flex; align-items: center; gap: 7px;">
+              <div style="width: 3px; height: 13px; border-radius: 2px; background: {{r.fg}};"></div>
+              <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; color: {{r.fg}};">{{r.verdict}}</span>
+            </div>
+            <div style="font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: {{r.reasonFg}}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{r.reason}}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <!-- ─────────── the chain ─────────── -->
+    <div style="display: flex; flex-direction: column; min-height: 0; background: #080a0f;">
+
+      <div style="padding: 16px 22px 0; display: flex; align-items: center; gap: 8px;">
+        <div style="width: 14px; height: 1px; background: #7c9cf5;"></div>
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.16em; text-transform: uppercase; color: #7c9cf5;">Proven by hash</span>
+      </div>
+
+      <div style="padding: 14px 22px 0;">
+        <div class="{{chain.trip}}" style="display: flex; align-items: center; gap: 11px; padding: 12px 14px; border-radius: 10px; background: {{chain.bg}}; border: 1px solid {{chain.border}};">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{chain.fg}}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;">
+            <path d="{{chain.icon}}"></path>
+          </svg>
+          <div style="min-width: 0;">
+            <div style="font-size: 13px; font-weight: 600; color: {{chain.fg}};">{{chain.title}}</div>
+            <div style="font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: #59606e; margin-top: 2px;">{{chain.meta}}</div>
+          </div>
+        </div>
+        <sc-if value="{{chain.broken}}" hint-placeholder-val="{{true}}">
+          <div style="margin-top: 8px; padding: 10px 12px; border-radius: 8px; background: #16090c; border: 1px solid #3d1418; font-family: 'IBM Plex Mono', monospace; font-size: 10px; line-height: 1.55; color: #f0a6a6; word-break: break-all;">{{chain.reason}}</div>
+        </sc-if>
+      </div>
+
+      <div style="flex-grow: 1; overflow-y: auto; min-height: 0; padding: 16px 22px 0;">
+        <sc-for list="{{blocks}}" as="b" hint-placeholder-count="7">
+          <div>
+            <div style="display: flex; align-items: stretch; gap: 10px;">
+              <div style="display: flex; flex-direction: column; align-items: center; width: 12px; flex-shrink: 0;">
+                <div style="width: 7px; height: 7px; border-radius: 2px; background: {{b.node}}; margin-top: 9px;"></div>
+                <sc-if value="{{b.link}}" hint-placeholder-val="{{true}}">
+                  <div style="width: 1px; flex-grow: 1; background: {{b.linkColor}}; min-height: 15px;"></div>
+                </sc-if>
+              </div>
+              <div style="flex-grow: 1; min-width: 0; padding-bottom: 4px;">
+                <div style="display: flex; align-items: baseline; gap: 8px;">
+                  <span style="font-size: 11.5px; font-weight: 500; color: {{b.fg}}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{b.label}}</span>
+                  <div style="flex-grow: 1;"></div>
+                  <span class="num" style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #3f4653;">{{b.seq}}</span>
+                </div>
+                <div style="font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; color: {{b.hashFg}}; margin-top: 2px;">{{b.hash}}</div>
+              </div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="padding: 14px 22px 18px; border-top: 1px solid #12161d; display: flex; flex-direction: column; gap: 8px;">
+        <div onClick="{{verify}}" style="text-align: center; padding: 9px; border-radius: 7px; background: #101827; border: 1px solid #1d2a44; color: #a8bff7; font-size: 12.5px; font-weight: 600; cursor: pointer; user-select: none;">Verify chain from genesis</div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div style="height: 1px; flex-grow: 1; background: #12161d;"></div>
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 0.13em; text-transform: uppercase; color: #2c3441;">attack it</span>
+          <div style="height: 1px; flex-grow: 1; background: #12161d;"></div>
+        </div>
+        <div style="display: flex; gap: 6px;">
+          <sc-for list="{{attacks}}" as="a" hint-placeholder-count="3">
+            <div onClick="{{a.run}}" style="flex-grow: 1; text-align: center; padding: 7px 4px; border-radius: 6px; background: transparent; border: 1px solid #241318; color: #a86a6a; font-size: 10.5px; font-weight: 500; cursor: pointer; user-select: none;">{{a.label}}</div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+
+<script data-dc-script data-props='{"speed":{"editor":"range","default":85,"min":25,"max":300,"step":5,"unit":"ms","section":"Demo"}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { phase: 'idle', rows: [], revoked: false, revokedAt: 0, broke: null };
+    this.timer = null;
+  }
+
+  componentWillUnmount() { if (this.timer) clearInterval(this.timer); }
+
+  batch() {
+    if (this._b) return this._b;
+    const ok = ['zepto', 'swiggy', 'bigbasket', 'blinkit'];
+    const cats = ['groceries', 'produce', 'dairy', 'household', 'snacks', 'bakery'];
+    const bad = [
+      ['amazon', 'electronics', 'MERCHANT_NOT_ALLOWED'],
+      ['bigbasket', 'alcohol', 'CATEGORY_EXCLUDED'],
+      ['zepto', 'groceries', 'OUTSIDE_TIME_WINDOW'],
+      ['swiggy', 'snacks', 'AMOUNT_CAP_EXCEEDED'],
+      ['flipkart', 'apparel', 'MERCHANT_NOT_ALLOWED'],
+      ['blinkit', 'tobacco', 'CATEGORY_EXCLUDED'],
+    ];
+    let s = 11;
+    const r = () => { s = (s * 1103515245 + 12345) % 2147483648; return s / 2147483648; };
+    const hex = (n) => Array.from({ length: n }, () => '0123456789abcdef'[Math.floor(r() * 16)]).join('');
+    const out = [];
+    for (let i = 0; i < 48; i++) {
+      const isBad = i > 1 && i % 6 === 4;
+      const day = Math.min(6, Math.floor(i / 7));
+      const hh = String(7 + (i % 15)).padStart(2, '0');
+      const mm = String(Math.floor(r() * 60)).padStart(2, '0');
+      let m, c, reason, amt;
+      if (isBad) {
+        const b = bad[Math.floor(r() * bad.length)];
+        m = b[0]; c = b[1]; reason = b[2];
+        amt = reason === 'AMOUNT_CAP_EXCEEDED' ? 1100 + Math.floor(r() * 700) : 80 + Math.floor(r() * 260);
+      } else {
+        m = ok[Math.floor(r() * ok.length)];
+        c = cats[Math.floor(r() * cats.length)];
+        reason = 'ALLOWED';
+        amt = 55 + Math.floor(r() * 300);
+      }
+      out.push({ day, time: hh + ':' + mm, merchant: m, category: c, reason, rupees: amt, hash: hex(10) });
+    }
+    this._b = out;
+    return out;
+  }
+
+  run = () => {
+    if (this.state.phase === 'streaming') { clearInterval(this.timer); this.setState({ phase: 'paused' }); return; }
+    if (this.state.phase === 'paused') { this.tick(this.state.rows.length); return; }
+    this.setState({ rows: [], revoked: false, revokedAt: 0, broke: null });
+    this.tick(0);
+  };
+
+  tick(from) {
+    clearInterval(this.timer);
+    this.setState({ phase: 'streaming' });
+    let i = from;
+    this.timer = setInterval(() => {
+      const src = this.batch();
+      if (i >= src.length) { clearInterval(this.timer); this.setState({ phase: 'done' }); return; }
+      const base = src[i]; i++;
+      const rev = this.state.revoked;
+      this.setState({
+        rows: [...this.state.rows, {
+          ...base, seq: i,
+          reason: rev ? 'MANDATE_REVOKED' : base.reason,
+          allowed: rev ? false : base.reason === 'ALLOWED',
+        }],
+      });
+    }, this.props.speed ?? 85);
+  }
+
+  revoke = () => {
+    if (this.state.revoked) return;
+    this.setState({ revoked: true, revokedAt: this.state.rows.length });
+  };
+
+  reset = () => {
+    clearInterval(this.timer);
+    this.setState({ phase: 'idle', rows: [], revoked: false, revokedAt: 0, broke: null });
+  };
+
+  attack = (kind) => () => {
+    const rows = this.state.rows;
+    if (rows.length < 4) return;
+    const mid = Math.floor(rows.length / 2);
+    const at = rows[mid];
+    const map = {
+      flip: { seq: at.seq, why: 'content altered: stored hash ' + at.hash + '… but contents hash to ' + rows[mid + 1].hash + '…' },
+      del: { seq: at.seq + 1, why: 'sequence gap: expected seq ' + at.seq + ', found ' + (at.seq + 1) + ' (1 entry missing)' },
+      forge: { seq: at.seq + 1, why: 'broken link: prev_hash ' + rows[mid + 1].hash + '… does not match preceding entry’s hash ' + at.hash + '…' },
+    };
+    this.setState({ broke: { kind, ...map[kind] } });
+  };
+
+  renderVals() {
+    const { rows, revoked, revokedAt, phase, broke } = this.state;
+    const streaming = phase === 'streaming';
+    const CAP = 5000;
+
+    const allowedRows = rows.filter((r) => r.allowed);
+    const allowed = allowedRows.length;
+    const blocked = rows.length - allowed;
+    const spent = allowedRows.reduce((a, r) => a + r.rupees, 0);
+    const inr = (n) => '₹' + n.toLocaleString('en-IN');
+    const pctRaw = Math.min(1, spent / CAP);
+
+    // Cumulative spend per day of the week -> a real burndown curve.
+    const perDay = [0, 0, 0, 0, 0, 0, 0];
+    allowedRows.forEach((r) => { perDay[r.day] += r.rupees; });
+    let acc = 0;
+    const cum = perDay.map((v) => (acc += v));
+    const W = 320, H = 46;
+    const pts = cum.map((v, i) => {
+      const x = (i / 6) * W;
+      const y = H - 3 - Math.min(1, v / CAP) * (H - 8);
+      return [x, y];
+    });
+    const path = rows.length
+      ? 'M' + pts.map((p) => p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' L')
+      : 'M0 ' + (H - 3) + ' L' + W + ' ' + (H - 3);
+    const area = rows.length
+      ? path + ' L' + W + ' ' + (H - 3) + ' L0 ' + (H - 3) + ' Z'
+      : '';
+
+    const budgetFg = pctRaw > 0.85 ? '#ff6b6b' : pctRaw > 0.6 ? '#e8b04b' : '#3ddc97';
+
+    const on = (v) => v
+      ? { dot: '#3ddc97', fg: '#8b93a3' }
+      : { dot: '#232a35', fg: '#3f4653' };
+    const pipeline = [
+      { label: 'policy', ...on(true) },
+      { label: 'compile', ...on(true) },
+      { label: 'sign', ...on(true) },
+      { label: 'enforce', ...on(rows.length > 0) },
+      { label: 'audit', ...on(rows.length > 0) },
+    ];
+
+    const band = revoked
+      ? {
+          label: 'Revoked', fg: '#ff6b6b', dot: '#ff6b6b', glow: 'rgba(255,107,107,.55)',
+          bg: 'linear-gradient(180deg, rgba(255,107,107,.05), transparent)',
+          sub: 'Withdrawn at transaction #' + revokedAt + '. Everything after it is refused.',
+        }
+      : {
+          label: 'Active', fg: '#e8ebf0', dot: '#3ddc97', glow: 'rgba(61,220,151,.5)',
+          bg: 'transparent',
+          sub: 'Within its validity window. The agent may spend under the terms below.',
+        };
+
+    const reasonFg = (r) => r.allowed ? '#4d6a5e' : (r.reason === 'MANDATE_REVOKED' ? '#ff6b6b' : '#b57676');
+
+    const view = rows.slice().reverse().slice(0, 80).map((r, i) => ({
+      seq: '#' + r.seq,
+      time: 'd' + (r.day + 1) + ' ' + r.time,
+      merchant: r.merchant,
+      category: r.category,
+      amount: inr(r.rupees),
+      amtFg: r.allowed ? '#e8ebf0' : '#6d7481',
+      verdict: r.allowed ? 'ALLOW' : 'BLOCK',
+      fg: r.allowed ? '#3ddc97' : '#ff6b6b',
+      reason: r.reason,
+      reasonFg: reasonFg(r),
+      bg: r.allowed ? 'transparent' : 'rgba(255,107,107,.028)',
+      anim: i === 0 && streaming ? 'in' : '',
+    }));
+
+    // Reason spectrum
+    const tally = {};
+    rows.forEach((r) => { tally[r.reason] = (tally[r.reason] || 0) + 1; });
+    const palette = {
+      ALLOWED: '#3ddc97', MANDATE_REVOKED: '#ff6b6b',
+      MERCHANT_NOT_ALLOWED: '#ff8f6b', CATEGORY_EXCLUDED: '#e8b04b',
+      OUTSIDE_TIME_WINDOW: '#c98ae0', AMOUNT_CAP_EXCEEDED: '#7c9cf5',
+    };
+    const entries = Object.entries(tally).sort((a, b) => b[1] - a[1]);
+    const total = rows.length || 1;
+    const spectrum = entries.map(([k, n]) => ({
+      w: ((n / total) * 100).toFixed(2) + '%',
+      color: palette[k] || '#59606e',
+    }));
+    const legend = entries.slice(0, 6).map(([k, n]) => ({
+      label: k.toLowerCase().replace(/_/g, ' '),
+      n: String(n),
+      color: palette[k] || '#59606e',
+    }));
+
+    const chainLen = rows.length + (revoked ? 2 : 1);
+    const isBroken = !!broke;
+    const chain = {
+      bg: isBroken ? '#16090c' : '#0b0f15',
+      border: isBroken ? '#3d1418' : '#17202c',
+      fg: isBroken ? '#ff6b6b' : '#3ddc97',
+      icon: isBroken
+        ? 'M12 8.5v4.5M12 16.6v.01M10.3 3.9L2.6 17.3a1.9 1.9 0 001.7 2.8h15.4a1.9 1.9 0 001.7-2.8L13.7 3.9a1.9 1.9 0 00-3.4 0z'
+        : 'M20 6L9 17l-5-5',
+      title: isBroken ? 'Tampering detected' : (rows.length ? 'Chain intact' : 'Chain empty'),
+      meta: isBroken
+        ? 'break at entry #' + broke.seq
+        : chainLen + ' entries · recomputed from genesis',
+      reason: isBroken ? broke.why : '',
+      broken: isBroken,
+      trip: isBroken ? 'trip' : '',
+    };
+
+    const blocks = [];
+    const recent = rows.slice().reverse().slice(0, 6);
+    if (revoked) {
+      blocks.push({
+        label: 'MANDATE_REVOKED', seq: '', hash: 'lifecycle event',
+        node: '#e8b04b', fg: '#e8b04b', hashFg: '#59606e',
+        link: true, linkColor: '#232a35',
+      });
+    }
+    recent.forEach((r, i) => {
+      const bad = isBroken && r.seq === broke.seq;
+      blocks.push({
+        label: r.allowed ? 'DECISION · ALLOW' : 'DECISION · ' + r.reason,
+        seq: '#' + r.seq,
+        hash: bad ? '⚠ ' + r.hash + '…' : r.hash + '…',
+        node: bad ? '#ff6b6b' : (r.allowed ? '#2a5f47' : '#5f2a2f'),
+        fg: bad ? '#ff6b6b' : '#8b93a3',
+        hashFg: bad ? '#ff6b6b' : '#2c3441',
+        link: i < recent.length - 1,
+        linkColor: bad ? '#3d1418' : '#161b23',
+      });
+    });
+    if (!blocks.length) {
+      blocks.push({
+        label: 'MANDATE_CREATED', seq: '#1', hash: 'genesis 000000…',
+        node: '#232a35', fg: '#59606e', hashFg: '#2c3441', link: false, linkColor: '#161b23',
+      });
+    }
+
+    return {
+      pipeline,
+      trip: revoked ? 'trip' : '',
+      band,
+      budget: {
+        spent: inr(spent), cap: inr(CAP), fg: budgetFg,
+        path, area,
+      },
+      days: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'],
+      kill: revoked
+        ? { label: 'Revoked', sub: 'Cannot be reinstated', bg: '#120a0c', border: '#2a1216', fg: '#6d4a4a', subFg: '#3f2a2d', cursor: 'default' }
+        : { label: 'Revoke mandate', sub: 'Stops the agent immediately', bg: '#1c0e11', border: '#4a1c22', fg: '#ff8080', subFg: '#96585c', cursor: 'pointer' },
+      revoke: this.revoke,
+      simulate: this.run,
+      reset: this.reset,
+      verify: () => this.forceUpdate(),
+      attacks: [
+        { label: 'Flip', run: this.attack('flip') },
+        { label: 'Delete', run: this.attack('del') },
+        { label: 'Forge', run: this.attack('forge') },
+      ],
+      policy: 'Let my agent buy groceries, up to ₹2,000 per week, only from Zepto, Swiggy or BigBasket, no alcohol, and only between 6am and 11pm.',
+      version: '1',
+      sig: '4f3a9c2e71b8…d0a4',
+      terms: [
+        { k: 'Per transaction', v: '₹1,000', fg: '#e8ebf0' },
+        { k: 'Per week', v: '₹5,000', fg: '#e8ebf0' },
+        { k: 'Frequency', v: '15 / week', fg: '#e8ebf0' },
+        { k: 'Merchants', v: 'zepto · swiggy · +2', fg: '#e8ebf0' },
+        { k: 'Never', v: 'alcohol · tobacco', fg: '#e8b04b' },
+        { k: 'Hours', v: '06:00 — 23:00', fg: '#e8ebf0' },
+      ],
+      streaming,
+      counts: [
+        { n: String(rows.length), label: 'seen', fg: '#e8ebf0' },
+        { n: String(allowed), label: 'allowed', fg: '#3ddc97' },
+        { n: String(blocked), label: 'blocked', fg: '#ff6b6b' },
+      ],
+      run: streaming
+        ? { label: 'Pause', bg: 'transparent', border: '#2c3441', fg: '#d5dae3' }
+        : { label: rows.length ? 'Resume' : 'Run batch', bg: '#1a2f57', border: '#26437a', fg: '#cfe0ff' },
+      spectrum, legend,
+      cols: [
+        { l: '#', a: 'left' }, { l: 'when', a: 'left' }, { l: 'merchant', a: 'left' },
+        { l: 'category', a: 'left' }, { l: 'amount', a: 'right' },
+        { l: 'verdict', a: 'left' }, { l: 'because', a: 'left' },
+      ],
+      rows: view,
+      empty: rows.length === 0,
+      chain,
+      blocks,
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -26,7 +26,7 @@ from sqlmodel import Session, select
 
 from app.audit import append_decision
 from app.database import engine as db_engine
-from app.engine import evaluate
+from app.engine import evaluate, period_bounds
 from app.models import Decision, Mandate, Transaction
 from app.usage import compute_usage
 
@@ -51,6 +51,16 @@ class SimulationStep:
     mandate_status: str
     allowed_so_far: int
     blocked_so_far: int
+
+    # Usage as the engine saw it for THIS transaction's period, so the
+    # dashboard can show the real budget state rather than reconstructing it
+    # client-side. `period_start` lets the UI notice a period rollover, which
+    # is why the burndown sawtooths instead of climbing forever.
+    period_start: str
+    period_spent: int
+    period_count: int
+    period_cap: int
+    frequency_cap: int
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -125,6 +135,7 @@ def simulate(
             usage = compute_usage(session, mandate, txn.timestamp)
             outcome = evaluate(mandate, txn, usage)
             entry = append_decision(session, txn, outcome)
+            period_start, _ = period_bounds(txn.timestamp, mandate.period)
 
             if outcome.allowed:
                 allowed += 1
@@ -149,6 +160,13 @@ def simulate(
                 mandate_status=mandate.status.value,
                 allowed_so_far=allowed,
                 blocked_so_far=blocked,
+                period_start=period_start.isoformat(),
+                # Usage is the state BEFORE this transaction; fold this one in
+                # when it was allowed, so the meter matches what just happened.
+                period_spent=usage.amount_spent + (txn.amount if outcome.allowed else 0),
+                period_count=usage.transaction_count + (1 if outcome.allowed else 0),
+                period_cap=mandate.amount_cap_period,
+                frequency_cap=mandate.frequency_cap,
             )
 
     from app.audit import verify_chain
