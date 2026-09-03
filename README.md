@@ -323,12 +323,16 @@ nothing else") have no representation. The compiler is instructed to flag the
 dropped constraint rather than silently discard it, and the eval corpus contains
 both cases — but a flagged-and-dropped constraint is still a dropped constraint.
 
-**The compiler's real-world accuracy is unmeasured.** The eval harness and its
-15-case corpus (Hinglish, shorthand amounts, midnight-crossing windows) are
-written and their logic is verified against stubs, but they have not been run
-against the live model — no API key was available in the build environment.
-Expect to iterate on the system prompt. The *gate* that bounds the compiler is
-fully tested and does not depend on model quality.
+**The compiler has been run against the live model — 15/15 on the eval corpus**
+(Hinglish, shorthand amounts, midnight-crossing windows, plus the two
+deliberately hard cases: a policy naming no merchant, correctly flagged *and*
+gate-rejected; a self-contradictory cap, correctly gate-rejected regardless of
+how faithfully the model translated it). Fifteen cases is not a statistically
+robust sample, and a single run doesn't rule out variance across re-runs — so
+treat this as "the approach works," not "the compiler is exhaustively
+validated." The *gate* that bounds the compiler is fully unit-tested and does
+not depend on model quality either way — the honest evidence stands regardless
+of how the eval corpus reads on any given run.
 
 **Dev signing keys live on disk** in a gitignored `.signing_key`. Production
 would put the private key in an HSM or KMS behind an authenticated service
@@ -392,7 +396,8 @@ Roughly 2,500 lines of application code and 2,500 lines of tests.
 
 - Anchor the chain head externally (publish or counter-sign) to close the
   full-rewrite gap
-- Run and tune the compiler eval against the live model
+- Grow the eval corpus past 15 cases and run it repeatedly to check for
+  variance, not just a single pass
 - Day-of-week and category-allowlist support in the schema
 - Real UAP integration once RBI approval lands
 - Multi-agent mandates: one principal, several agents, shared budget

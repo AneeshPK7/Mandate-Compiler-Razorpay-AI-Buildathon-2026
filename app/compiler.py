@@ -26,10 +26,14 @@ from pydantic import BaseModel, Field
 
 from app.models import Mandate, MandateStatus, Period, utcnow
 
-# Gemini 2.5 Flash: confirmed free-tier eligible (no billing required) as of
-# this writing. Bump this constant, not call sites, if a newer free Flash
-# model ships — nothing else in this file should need to change.
-MODEL = "gemini-2.5-flash"
+# Gemini 3.1 Flash-Lite. Chosen over 3.6-flash after live testing: 3.6-flash
+# took 20s+ and sometimes returned no text at all (plausibly a reasoning model
+# spending its output budget on invisible thinking tokens before ever reaching
+# the answer) — a real reliability risk for structured output, not just
+# today's load. flash-lite answered correctly in ~4s. gemini-2.5-flash and
+# gemini-2.0-flash are both retired for new users (confirmed via live 404s).
+# Bump this constant, not call sites, if a newer free Flash model ships.
+MODEL = "gemini-3.1-flash-lite"
 PAISE_PER_RUPEE = 100
 
 # Bounds for the validation gate. These are guardrails on the *compiler*, not
