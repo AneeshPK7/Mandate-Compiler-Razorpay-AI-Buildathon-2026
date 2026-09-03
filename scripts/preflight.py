@@ -139,7 +139,7 @@ def main() -> int:
 
     # --- things that must be true before the server even starts -------------
     def deps():
-        import anthropic  # noqa: F401
+        import google.genai  # noqa: F401
         import nacl  # noqa: F401
         import sqlmodel  # noqa: F401
         return None
@@ -156,11 +156,12 @@ def main() -> int:
     check("Ed25519 signing key available", signing_key)
 
     def compiler_key():
-        if os.environ.get("ANTHROPIC_API_KEY"):
-            return "ANTHROPIC_API_KEY is set"
+        if os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"):
+            return "GEMINI_API_KEY is set"
         raise AssertionError(
-            "ANTHROPIC_API_KEY not set — the compile step will report "
-            "'unavailable'. Everything else still works."
+            "GEMINI_API_KEY not set (free at ai.google.dev, no billing "
+            "required) — the compile step will report 'unavailable'. "
+            "Everything else still works."
         )
 
     # Soft: without a key the compile step reports "unavailable", which is

@@ -5,5 +5,5 @@ pydantic
 pynacl
 jinja2
 python-multipart
-anthropic
+google-genai
 pytest

@@ -3,7 +3,7 @@
 
 Run with a key configured:
 
-    export ANTHROPIC_API_KEY=...
+    export GEMINI_API_KEY=...   # free, no billing required — ai.google.dev
     python scripts/eval_compiler.py            # all cases
     python scripts/eval_compiler.py --case 3   # one case, verbose
 

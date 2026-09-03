@@ -52,7 +52,7 @@ no more than ₹1000 a week"* — and **Compile** again.
 >
 > A hallucinated cap is a translation bug. It never gets to be a spending bug.
 
-> ⚠️ **Without `ANTHROPIC_API_KEY` set**, Compile shows a red "Compiler
+> ⚠️ **Without `GEMINI_API_KEY` set**, Compile shows a red "Compiler
 > unavailable" notice instead. Skip to **Demo mandate** (next to Compile) and
 > say: *"the compiler needs an API key; here's a pre-compiled mandate"* — then
 > continue. Nothing else in the demo depends on it.

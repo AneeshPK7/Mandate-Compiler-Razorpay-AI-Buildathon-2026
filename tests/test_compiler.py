@@ -9,9 +9,11 @@ import pytest
 
 from app.compiler import (
     PAISE_PER_RUPEE,
+    SYSTEM_PROMPT,
     AmbiguityFlag,
     MandateDraft,
     ValidationError,
+    _DRAFT_SCHEMA,
     compile_policy,
     draft_to_mandate,
     validate_draft,
@@ -185,33 +187,51 @@ def test_conversion_error_names_the_problem():
 
 class FakeResponse:
     def __init__(self, draft):
-        self.parsed_output = draft
+        # The real SDK returns raw JSON text; compile_policy parses it itself
+        # rather than trusting an SDK-provided `.parsed` object, so the fake
+        # mirrors exactly that surface.
+        self.text = draft.model_dump_json()
 
 
 class FakeClient:
-    """Stands in for anthropic.Anthropic to test plumbing without a live call."""
+    """Stands in for genai.Client to test plumbing without a live call."""
 
     def __init__(self, draft):
         self._draft = draft
         self.calls = []
-        self.messages = self
+        self.models = self
 
-    def parse(self, **kwargs):
+    def generate_content(self, **kwargs):
         self.calls.append(kwargs)
         return FakeResponse(self._draft)
 
 
 def test_compile_policy_returns_parsed_draft():
     draft = make_draft()
-    assert compile_policy("spend on groceries", client=FakeClient(draft)) is draft
+    result = compile_policy("spend on groceries", client=FakeClient(draft))
+    assert result == draft
 
 
 def test_compile_policy_sends_the_policy_text():
     client = FakeClient(make_draft())
     compile_policy("  only zepto up to 500  ", client=client)
     sent = client.calls[0]
-    assert sent["messages"][0]["content"] == "only zepto up to 500"
-    assert sent["output_format"] is MandateDraft
+    assert sent["contents"] == "only zepto up to 500"
+    assert sent["config"].system_instruction == SYSTEM_PROMPT
+    assert sent["config"].response_mime_type == "application/json"
+
+
+def test_compiled_schema_has_no_dangling_refs():
+    """Regression guard for googleapis/python-genai#60: nested Pydantic models
+    (MandateDraft nests list[AmbiguityFlag]) must be fully inlined before
+    reaching the API, or the SDK's known $ref-resolution bug silently breaks
+    structured output."""
+    import json
+
+    serialized = json.dumps(_DRAFT_SCHEMA)
+    assert "$ref" not in serialized
+    assert "$defs" not in serialized
+    assert _DRAFT_SCHEMA["properties"]["ambiguities"]["items"]["properties"]["field"]
 
 
 @pytest.mark.parametrize("empty", ["", "   ", "\n"])

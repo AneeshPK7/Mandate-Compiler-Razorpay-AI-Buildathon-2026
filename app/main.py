@@ -59,6 +59,7 @@ def compile_endpoint(body: CompileRequest, session: Session = Depends(get_sessio
     """
     from app.compiler import (
         PAISE_PER_RUPEE,
+        EmptyPolicyError,
         compile_policy,
         draft_to_mandate,
         validate_draft,
@@ -66,13 +67,13 @@ def compile_endpoint(body: CompileRequest, session: Session = Depends(get_sessio
 
     try:
         draft = compile_policy(body.text)
-    except ValueError as exc:
+    except EmptyPolicyError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:  # noqa: BLE001 - surface, don't crash the demo
         return {
             "status": "unavailable",
             "error": f"{type(exc).__name__}: {exc}",
-            "hint": "Set ANTHROPIC_API_KEY to enable the compiler.",
+            "hint": "Set GEMINI_API_KEY to enable the compiler.",
         }
 
     problems = validate_draft(draft)

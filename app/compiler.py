@@ -18,14 +18,18 @@ and trivial to get right — and the conversion happens here in code.
 
 from __future__ import annotations
 
+import copy
 from datetime import timedelta
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
 from app.models import Mandate, MandateStatus, Period, utcnow
 
-MODEL = "claude-opus-5"
+# Gemini 2.5 Flash: confirmed free-tier eligible (no billing required) as of
+# this writing. Bump this constant, not call sites, if a newer free Flash
+# model ships — nothing else in this file should need to change.
+MODEL = "gemini-2.5-flash"
 PAISE_PER_RUPEE = 100
 
 # Bounds for the validation gate. These are guardrails on the *compiler*, not
@@ -110,9 +114,54 @@ Defaults when the text is silent (each REQUIRES an ambiguity entry):
 
 
 def _client():
-    import anthropic
+    from google import genai
 
-    return anthropic.Anthropic()
+    # Reads GEMINI_API_KEY (or GOOGLE_API_KEY) from the environment — no key
+    # threaded through call sites.
+    return genai.Client()
+
+
+def _inline_json_schema(model: type[BaseModel]) -> dict[str, Any]:
+    """A Pydantic JSON schema with every `$ref` resolved inline.
+
+    Pydantic's own `model_json_schema()` factors nested models out into a
+    `$defs` block and points at them with `$ref`. The Gemini SDK's structured-
+    output path has a confirmed bug resolving those refs for nested models
+    (googleapis/python-genai#60) — `MandateDraft` nests `list[AmbiguityFlag]`,
+    so it hits this directly. Rather than trust that bug is fixed in whatever
+    SDK version happens to be installed, the schema is flattened here so no
+    `$ref` ever reaches the API.
+    """
+    schema = model.model_json_schema()
+    defs = schema.pop("$defs", {})
+
+    def resolve(node: Any) -> Any:
+        if isinstance(node, dict):
+            if "$ref" in node:
+                # $ref points at "#/$defs/Name"; the rest of the sibling keys
+                # (if any) are dropped, matching how these refs are actually
+                # emitted by Pydantic — a $ref is always the sole key.
+                name = node["$ref"].rsplit("/", 1)[-1]
+                return resolve(copy.deepcopy(defs[name]))
+            return {k: resolve(v) for k, v in node.items()}
+        if isinstance(node, list):
+            return [resolve(v) for v in node]
+        return node
+
+    return resolve(schema)
+
+
+# Computed once at import time: the schema never changes at runtime, and
+# resolving it is pure work worth doing exactly once.
+_DRAFT_SCHEMA = _inline_json_schema(MandateDraft)
+
+
+class EmptyPolicyError(ValueError):
+    """The input text was empty. Distinct from any other ValueError a provider
+    SDK might raise (e.g. Gemini raises a plain ValueError for a missing API
+    key) — callers need to tell "bad input" apart from "can't reach the model"
+    by exception type, not by hoping no SDK ever collides with the base class.
+    """
 
 
 def compile_policy(text: str, client=None) -> MandateDraft:
@@ -122,17 +171,21 @@ def compile_policy(text: str, client=None) -> MandateDraft:
     trustworthy until it has passed `validate_draft`.
     """
     if not text or not text.strip():
-        raise ValueError("policy text is empty")
+        raise EmptyPolicyError("policy text is empty")
+
+    from google.genai import types
 
     client = client or _client()
-    response = client.messages.parse(
+    response = client.models.generate_content(
         model=MODEL,
-        max_tokens=8000,
-        system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": text.strip()}],
-        output_format=MandateDraft,
+        contents=text.strip(),
+        config=types.GenerateContentConfig(
+            system_instruction=SYSTEM_PROMPT,
+            response_mime_type="application/json",
+            response_json_schema=_DRAFT_SCHEMA,
+        ),
     )
-    return response.parsed_output
+    return MandateDraft.model_validate_json(response.text)
 
 
 # Fields where a guess is not good enough to enforce without a human saying so.

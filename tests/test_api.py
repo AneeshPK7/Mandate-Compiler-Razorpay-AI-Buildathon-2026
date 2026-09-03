@@ -261,12 +261,12 @@ def test_compile_rejects_empty_text(sim_client):
 def test_compile_without_credentials_degrades_gracefully(sim_client, monkeypatch):
     """No API key must produce a reported status, never a 500."""
     def boom(*args, **kwargs):
-        raise RuntimeError("Could not resolve authentication method")
+        raise RuntimeError("GEMINI_API_KEY environment variable not set")
 
     monkeypatch.setattr("app.compiler.compile_policy", boom)
     body = sim_client.post("/compile", json={"text": "spend 500 at zepto"}).json()
     assert body["status"] == "unavailable"
-    assert "ANTHROPIC_API_KEY" in body["hint"]
+    assert "GEMINI_API_KEY" in body["hint"]
 
 
 def test_compile_reports_gate_rejection_without_signing(sim_client, monkeypatch):

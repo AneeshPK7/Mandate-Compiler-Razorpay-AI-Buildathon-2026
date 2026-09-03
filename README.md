@@ -44,7 +44,7 @@ non-LLM engine decides whether each payment is permitted.
 ```mermaid
 flowchart TB
     subgraph LLM ["LLM — translation only, never trusted"]
-        A["Plain English or Hinglish policy"] --> B["Compiler<br/><i>Claude structured output</i>"]
+        A["Plain English or Hinglish policy"] --> B["Compiler<br/><i>Gemini structured output</i>"]
         B --> C["MandateDraft<br/>+ self-flagged guesses"]
     end
 
@@ -81,7 +81,8 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload            # http://localhost:8000
 ```
 
-The compiler needs `ANTHROPIC_API_KEY`. Everything else — engine, signing,
+The compiler needs `GEMINI_API_KEY` — free, no billing required, from
+[ai.google.dev](https://ai.google.dev). Everything else — engine, signing,
 audit chain, simulator, revocation — runs without it, and the dashboard reports
 the compiler as unavailable rather than failing.
 
